@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin - who-tech-course</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: -apple-system, sans-serif; background: #f5f5f5; color: #333; }
+      .container { max-width: 720px; margin: 40px auto; padding: 0 20px; }
+      h1 { font-size: 20px; margin-bottom: 24px; }
+      .card { background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 16px; border: 1px solid #e0e0e0; }
+      .card h2 { font-size: 14px; color: #666; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+      .stat { font-size: 28px; font-weight: bold; }
+      .sub { font-size: 13px; color: #999; margin-top: 4px; }
+      input, textarea { width: 100%; padding: 8px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; margin-bottom: 8px; font-family: monospace; }
+      button { padding: 8px 16px; border: none; border-radius: 4px; font-size: 14px; cursor: pointer; }
+      .btn-primary { background: #0070f3; color: #fff; }
+      .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
+      .btn-danger { background: #e53e3e; color: #fff; }
+      .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; background: #e8f5e9; color: #2e7d32; margin-left: 8px; }
+      #login { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; }
+      #login .box { background: #fff; padding: 32px; border-radius: 8px; width: 320px; }
+      #login h2 { margin-bottom: 16px; }
+      #toast { position: fixed; bottom: 24px; right: 24px; background: #333; color: #fff; padding: 10px 16px; border-radius: 6px; font-size: 14px; display: none; }
+    </style>
+  </head>
+  <body>
+    <div id="login">
+      <div class="box">
+        <h2>Admin 로그인</h2>
+        <input type="password" id="secret-input" placeholder="ADMIN_SECRET" />
+        <button class="btn-primary" onclick="login()" style="width:100%">로그인</button>
+      </div>
+    </div>
+
+    <div class="container" id="main" style="display:none">
+      <h1>who-tech-course 어드민</h1>
+
+      <div class="card">
+        <h2>수집 현황</h2>
+        <div class="stat" id="member-count">-</div>
+        <div class="sub">수집된 멤버 수</div>
+        <div class="sub" id="last-sync" style="margin-top:8px">마지막 sync: -</div>
+      </div>
+
+      <div class="card">
+        <h2>수동 Sync <span class="badge" id="sync-target">javascript-lotto</span></h2>
+        <p style="font-size:13px;color:#666;margin-bottom:12px">woowacourse/javascript-lotto PR을 수집합니다.</p>
+        <button class="btn-primary" id="sync-btn" onclick="triggerSync()">Sync 실행</button>
+        <div id="sync-result" style="margin-top:8px;font-size:13px;color:#666"></div>
+      </div>
+
+      <div class="card">
+        <h2>Workspace 설정</h2>
+        <label style="font-size:13px;color:#666">닉네임 정규식</label>
+        <input type="text" id="nickname-regex" />
+        <label style="font-size:13px;color:#666">기수 규칙 (JSON)</label>
+        <textarea id="cohort-rules" rows="4"></textarea>
+        <button class="btn-primary" onclick="saveWorkspace()">저장</button>
+      </div>
+    </div>
+
+    <div id="toast"></div>
+
+    <script>
+      let token = '';
+
+      function login() {
+        token = document.getElementById('secret-input').value;
+        fetch('/admin/status', { headers: { Authorization: `Bearer ${token}` } })
+          .then(r => {
+            if (r.ok) {
+              document.getElementById('login').style.display = 'none';
+              document.getElementById('main').style.display = 'block';
+              loadStatus();
+              loadWorkspace();
+            } else {
+              alert('잘못된 비밀키입니다.');
+            }
+          });
+      }
+
+      function loadStatus() {
+        fetch('/admin/status', { headers: { Authorization: `Bearer ${token}` } })
+          .then(r => r.json())
+          .then(data => {
+            document.getElementById('member-count').textContent = data.memberCount;
+            document.getElementById('last-sync').textContent =
+              '마지막 sync: ' + (data.lastSyncAt ? new Date(data.lastSyncAt).toLocaleString('ko-KR') : '없음');
+          });
+      }
+
+      function loadWorkspace() {
+        fetch('/admin/workspace', { headers: { Authorization: `Bearer ${token}` } })
+          .then(r => r.json())
+          .then(data => {
+            document.getElementById('nickname-regex').value = data.nicknameRegex;
+            document.getElementById('cohort-rules').value = JSON.stringify(data.cohortRules, null, 2);
+          });
+      }
+
+      function triggerSync() {
+        const btn = document.getElementById('sync-btn');
+        const result = document.getElementById('sync-result');
+        btn.disabled = true;
+        btn.textContent = 'Sync 중...';
+        result.textContent = '';
+
+        fetch('/admin/sync', { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+          .then(r => r.json())
+          .then(data => {
+            result.textContent = `완료: ${data.synced}건 수집됨`;
+            loadStatus();
+            toast(`${data.synced}건 수집 완료`);
+          })
+          .catch(() => { result.textContent = '오류가 발생했습니다.'; })
+          .finally(() => { btn.disabled = false; btn.textContent = 'Sync 실행'; });
+      }
+
+      function saveWorkspace() {
+        const nicknameRegex = document.getElementById('nickname-regex').value;
+        let cohortRules;
+        try {
+          cohortRules = JSON.parse(document.getElementById('cohort-rules').value);
+        } catch {
+          alert('기수 규칙 JSON 형식이 올바르지 않습니다.');
+          return;
+        }
+
+        fetch('/admin/workspace', {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nicknameRegex, cohortRules }),
+        })
+          .then(r => r.json())
+          .then(() => toast('저장됐어요'));
+      }
+
+      function toast(msg) {
+        const el = document.getElementById('toast');
+        el.textContent = msg;
+        el.style.display = 'block';
+        setTimeout(() => { el.style.display = 'none'; }, 2500);
+      }
+
+      document.getElementById('secret-input').addEventListener('keydown', e => {
+        if (e.key === 'Enter') login();
+      });
+    </script>
+  </body>
+</html>
