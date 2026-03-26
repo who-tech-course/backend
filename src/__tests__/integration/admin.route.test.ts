@@ -23,6 +23,9 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await prisma.blogPost.deleteMany();
+  await prisma.submission.deleteMany();
+  await prisma.member.deleteMany();
   await prisma.missionRepo.deleteMany();
   await prisma.workspace.deleteMany();
   await prisma.$disconnect();
@@ -136,5 +139,41 @@ describe('레포 관리 CRUD', () => {
     const res = await request(app).delete(`/admin/repos/${repoId}`).set('Authorization', `Bearer ${ADMIN_SECRET}`);
     expect(res.status).toBe(204);
     repoId = 0;
+  });
+});
+
+describe('멤버 관리', () => {
+  let memberId: number;
+  let workspaceId: number;
+
+  beforeAll(async () => {
+    const workspace = await prisma.workspace.findFirstOrThrow({ where: { name: 'woowacourse' } });
+    workspaceId = workspace.id;
+    const member = await prisma.member.create({
+      data: {
+        githubId: 'iftype',
+        nickname: '빌리',
+        workspaceId,
+      },
+    });
+    memberId = member.id;
+  });
+
+  afterAll(async () => {
+    await prisma.member.deleteMany({ where: { workspaceId } });
+  });
+
+  it('PATCH /admin/members/:id: manualNickname과 blog를 수정한다', async () => {
+    const res = await request(app)
+      .patch(`/admin/members/${memberId}`)
+      .set('Authorization', `Bearer ${ADMIN_SECRET}`)
+      .send({
+        manualNickname: '빌리',
+        blog: 'https://iftype.github.io',
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.manualNickname).toBe('빌리');
+    expect(res.body.blog).toBe('https://iftype.github.io');
   });
 });

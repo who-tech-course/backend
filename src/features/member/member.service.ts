@@ -25,12 +25,24 @@ export async function listMembers(filters?: { q?: string; cohort?: number; hasBl
     include: {
       _count: { select: { submissions: true } },
       blogPosts: { orderBy: { publishedAt: 'desc' }, take: 5 },
+      submissions: {
+        orderBy: { submittedAt: 'desc' },
+        include: {
+          missionRepo: {
+            select: {
+              name: true,
+              track: true,
+            },
+          },
+        },
+      },
     },
   });
 
   return members.map((member) => ({
     ...member,
     nickname: resolveDisplayNickname(member.manualNickname, member.nicknameStats, member.nickname),
+    tracks: [...new Set(member.submissions.map((submission) => submission.missionRepo.track))],
   }));
 }
 
@@ -50,12 +62,24 @@ export async function updateMember(
     include: {
       _count: { select: { submissions: true } },
       blogPosts: { orderBy: { publishedAt: 'desc' }, take: 5 },
+      submissions: {
+        orderBy: { submittedAt: 'desc' },
+        include: {
+          missionRepo: {
+            select: {
+              name: true,
+              track: true,
+            },
+          },
+        },
+      },
     },
   });
 
   return {
     ...member,
     nickname: resolveDisplayNickname(member.manualNickname, member.nicknameStats, member.nickname),
+    tracks: [...new Set(member.submissions.map((submission) => submission.missionRepo.track))],
   };
 }
 

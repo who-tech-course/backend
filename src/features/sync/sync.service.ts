@@ -2,7 +2,7 @@ import type { Octokit } from '@octokit/rest';
 import prisma from '../../db/prisma.js';
 import { findNicknameRegexByCohort, parseCohortRegexRules } from '../../shared/cohort-regex.js';
 import { mergeNicknameStat, resolveDisplayNickname } from '../../shared/nickname.js';
-import { fetchRepoPRs, parseNickname, detectCohort } from './github.service.js';
+import { fetchRepoPRs, fetchUserBlogUrl, parseNickname, detectCohort } from './github.service.js';
 import type { CohortRegexRule, CohortRule, ParsedSubmission } from '../../shared/types/index.js';
 
 type RawPR = {
@@ -63,6 +63,7 @@ export async function syncRepo(
     cohortRules,
     parseCohortRegexRules(repo.cohortRegexRules),
   );
+  const blogCache = new Map<string, string | null>();
 
   let synced = 0;
 
@@ -78,6 +79,15 @@ export async function syncRepo(
       JSON.stringify(nicknameStats),
       s.nickname,
     );
+    let blog = existingMember?.blog ?? null;
+
+    if (!blog) {
+      if (!blogCache.has(s.githubId)) {
+        blogCache.set(s.githubId, await fetchUserBlogUrl(octokit, s.githubId).catch(() => null));
+      }
+
+      blog = blogCache.get(s.githubId) ?? null;
+    }
 
     const member = await prisma.member.upsert({
       where: { githubId_workspaceId: { githubId: s.githubId, workspaceId } },
@@ -85,12 +95,14 @@ export async function syncRepo(
         githubId: s.githubId,
         nickname: displayNickname,
         cohort: s.cohort,
+        blog,
         nicknameStats: JSON.stringify(nicknameStats),
         workspaceId,
       },
       update: {
         nickname: displayNickname,
         cohort: s.cohort,
+        ...(existingMember?.blog ? {} : { blog }),
         nicknameStats: JSON.stringify(nicknameStats),
       },
     });

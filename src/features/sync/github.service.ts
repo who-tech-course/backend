@@ -46,3 +46,8 @@ export async function fetchRepoPRs(
 
   return allPRs;
 }
+
+export async function fetchUserBlogUrl(octokit: Octokit, username: string): Promise<string | null> {
+  const { data } = await octokit.users.getByUsername({ username });
+  return data.blog?.trim() ? data.blog.trim() : null;
+}
