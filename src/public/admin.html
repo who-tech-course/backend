@@ -45,8 +45,8 @@
       </div>
 
       <div class="card">
-        <h2>수동 Sync <span class="badge" id="sync-target">javascript-lotto</span></h2>
-        <p style="font-size:13px;color:#666;margin-bottom:12px">woowacourse/javascript-lotto PR을 수집합니다.</p>
+        <h2>수동 Sync</h2>
+        <p style="font-size:13px;color:#666;margin-bottom:12px">woowacourse 조직의 미션 레포 전체 PR을 수집합니다.</p>
         <button class="btn-primary" id="sync-btn" onclick="triggerSync()">Sync 실행</button>
         <div id="sync-result" style="margin-top:8px;font-size:13px;color:#666"></div>
       </div>
@@ -110,9 +110,9 @@
         fetch('/admin/sync', { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
           .then(r => r.json())
           .then(data => {
-            result.textContent = `완료: ${data.synced}건 수집됨`;
+            result.textContent = `완료: ${data.reposSynced}개 레포, ${data.totalSynced}건 수집됨`;
             loadStatus();
-            toast(`${data.synced}건 수집 완료`);
+            toast(`${data.totalSynced}건 수집 완료`);
           })
           .catch(() => { result.textContent = '오류가 발생했습니다.'; })
           .finally(() => { btn.disabled = false; btn.textContent = 'Sync 실행'; });

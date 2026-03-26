@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { createOctokit } from '../services/github.service.js';
-import { syncRepo } from '../services/sync.service.js';
+import { syncWorkspace } from '../services/sync.service.js';
 import prisma from '../db/prisma.js';
 import { adminAuth } from '../middleware/auth.js';
 import type { CohortRule } from '../types/index.js';
@@ -49,21 +49,11 @@ router.put('/workspace', async (req, res) => {
 
 router.post('/sync', async (_req, res) => {
   const workspace = await prisma.workspace.findFirstOrThrow({ where: { name: 'woowacourse' } });
-  const cohortRules: CohortRule[] = JSON.parse(workspace.cohortRules);
-  const nicknameRegex = new RegExp(workspace.nicknameRegex);
   const octokit = createOctokit(process.env['GITHUB_TOKEN']);
 
-  const { synced } = await syncRepo(
-    octokit,
-    workspace.id,
-    workspace.githubOrg,
-    'javascript-lotto',
-    'https://github.com/woowacourse/javascript-lotto',
-    nicknameRegex,
-    cohortRules,
-  );
+  const { totalSynced, reposSynced } = await syncWorkspace(octokit, workspace.id);
 
-  res.json({ synced });
+  res.json({ totalSynced, reposSynced });
 });
 
 export default router;
