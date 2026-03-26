@@ -2,6 +2,7 @@ import express from 'express';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { adminAuth } from './shared/middleware/auth.js';
+import { errorHandler } from './shared/middleware/error.js';
 import workspaceRouter from './features/workspace/workspace.route.js';
 import repoRouter from './features/repo/repo.route.js';
 import syncRouter from './features/sync/sync.route.js';
@@ -25,5 +26,6 @@ app.use('/admin/repos', repoRouter);
 app.use('/admin', syncRouter);
 app.use('/admin', blogRouter);
 app.use('/admin/members', memberRouter);
+app.use(errorHandler);
 
 export default app;
