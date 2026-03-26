@@ -1,26 +1,30 @@
-import prisma from '../../db/prisma.js';
-import { createOctokit } from './github.service.js';
-import { syncWorkspace } from './sync.service.js';
-import { getWorkspaceOrThrow } from '../workspace/workspace.service.js';
+import type { Octokit } from '@octokit/rest';
+import type { MemberRepository } from '../../db/repositories/member.repository.js';
+import type { MissionRepoRepository } from '../../db/repositories/mission-repo.repository.js';
+import type { WorkspaceService } from '../workspace/workspace.service.js';
+import type { SyncService } from './sync.service.js';
 
-export async function getAdminStatus(): Promise<{
-  memberCount: number;
-  repoCount: number;
-  lastSyncAt: Date | null;
-}> {
-  const workspace = await prisma.workspace.findFirst({ where: { name: 'woowacourse' } });
-  const [memberCount, repoCount] = await Promise.all([prisma.member.count(), prisma.missionRepo.count()]);
+export function createSyncAdminService(deps: {
+  memberRepo: MemberRepository;
+  missionRepoRepo: MissionRepoRepository;
+  workspaceService: WorkspaceService;
+  syncService: SyncService;
+  octokit: Octokit;
+}) {
+  const { memberRepo, missionRepoRepo, workspaceService, syncService, octokit } = deps;
 
   return {
-    memberCount,
-    repoCount,
-    lastSyncAt: workspace?.updatedAt ?? null,
+    getAdminStatus: async (): Promise<{ memberCount: number; repoCount: number; lastSyncAt: Date | null }> => {
+      const workspace = await workspaceService.getOrThrow().catch(() => null);
+      const [memberCount, repoCount] = await Promise.all([memberRepo.count(), missionRepoRepo.count()]);
+      return { memberCount, repoCount, lastSyncAt: workspace?.updatedAt ?? null };
+    },
+
+    syncAdminWorkspace: async () => {
+      const workspace = await workspaceService.getOrThrow();
+      return syncService.syncWorkspace(octokit, workspace.id);
+    },
   };
 }
 
-export async function syncAdminWorkspace() {
-  const workspace = await getWorkspaceOrThrow();
-  const octokit = createOctokit(process.env['GITHUB_TOKEN']);
-
-  return syncWorkspace(octokit, workspace.id);
-}
+export type SyncAdminService = ReturnType<typeof createSyncAdminService>;

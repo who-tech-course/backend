@@ -1,14 +1,26 @@
 import { Router } from 'express';
-import { asyncHandler } from '../../shared/http.js';
-import { syncWorkspaceBlogs } from './blog.admin.service.js';
+import { asyncHandler, badRequest } from '../../shared/http.js';
+import type { BlogAdminService } from './blog.admin.service.js';
 
-const router = Router();
+export function createBlogRouter(service: BlogAdminService) {
+  const router = Router();
 
-router.post(
-  '/blog/sync',
-  asyncHandler(async (_req, res) => {
-    res.json(await syncWorkspaceBlogs());
-  }),
-);
+  router.post(
+    '/blog/sync',
+    asyncHandler(async (_req, res) => {
+      res.json(await service.syncWorkspaceBlogs());
+    }),
+  );
 
-export default router;
+  router.post(
+    '/blog/backfill',
+    asyncHandler(async (req, res) => {
+      const limitValue = req.query['limit'];
+      const limit = typeof limitValue === 'string' ? Number(limitValue) : 30;
+      if (Number.isNaN(limit) || limit < 1 || limit > 50) badRequest('invalid limit');
+      res.json(await service.backfillWorkspaceBlogLinks(limit));
+    }),
+  );
+
+  return router;
+}
