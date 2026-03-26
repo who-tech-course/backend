@@ -172,6 +172,7 @@
                 <span class="repo-name">${repo.name}</span>
                 <span class="repo-regex">${repo.track} · ${repo.type}</span>
                 <span class="repo-regex">${repo.nicknameRegex ?? '기본 정규식'}</span>
+                <button class="btn-sm" onclick="syncRepo(${repo.id}, this)">Sync</button>
                 <button class="btn-sm" onclick="editRepoRegex(${repo.id}, ${JSON.stringify(repo.nicknameRegex ?? '')})">수정</button>
                 <button class="btn-danger" onclick="deleteRepo(${repo.id})">삭제</button>
               </div>
@@ -202,6 +203,20 @@
             toast(`${name} 추가됨`);
           })
           .catch(() => alert('이미 존재하거나 오류가 발생했습니다.'));
+      }
+
+      function syncRepo(id, btn) {
+        btn.disabled = true;
+        btn.textContent = '...';
+        fetch(`/admin/repos/${id}/sync`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+          .then(r => r.json())
+          .then(data => {
+            loadStatus();
+            loadMembers();
+            toast(`${data.synced}건 수집됨`);
+          })
+          .catch(() => toast('Sync 실패'))
+          .finally(() => { btn.disabled = false; btn.textContent = 'Sync'; });
       }
 
       function editRepoRegex(id, current) {
