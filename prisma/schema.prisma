@@ -23,6 +23,7 @@ model Member {
   githubId    String
   nickname    String?
   cohort      Int?
+  blog        String?
   workspaceId Int
   workspace   Workspace    @relation(fields: [workspaceId], references: [id])
   submissions Submission[]
