@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { parsePRsToSubmissions } from '../services/sync.service.js';
+import { parsePRsToSubmissions } from '../../services/sync.service.js';
 
 const NICKNAME_REGEX = /\[.+\] (.+) 미션 제출합니다/;
 const COHORT_RULES = [

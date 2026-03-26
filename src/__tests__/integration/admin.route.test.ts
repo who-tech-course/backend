@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import request from 'supertest';
-import app from '../app.js';
-import prisma from '../db/prisma.js';
+import app from '../../app.js';
+import prisma from '../../db/prisma.js';
 
 const ADMIN_SECRET = 'test-secret';
 process.env['ADMIN_SECRET'] = ADMIN_SECRET;

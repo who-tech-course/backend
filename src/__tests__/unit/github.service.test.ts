@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { parseNickname, detectCohort, isMissionRepo } from '../services/github.service.js';
+import { parseNickname, detectCohort, isMissionRepo } from '../../services/github.service.js';
 
 describe('parseNickname', () => {
   it('PR 제목에서 닉네임을 추출한다', () => {

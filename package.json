@@ -13,6 +13,8 @@
     "format:check": "prettier --check .",
     "prepare": "husky",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest",
+    "test:unit": "NODE_OPTIONS=--experimental-vm-modules jest __tests__/unit",
+    "test:integration": "NODE_OPTIONS=--experimental-vm-modules jest __tests__/integration",
     "test:watch": "NODE_OPTIONS=--experimental-vm-modules jest --watch",
     "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage"
   },
