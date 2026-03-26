@@ -30,8 +30,16 @@
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.21.0"
   },
+  "engines": {
+    "node": ">=20.18.0"
+  },
   "lint-staged": {
-    "*.{ts}": ["eslint --fix", "prettier --write"],
-    "*.{json,md}": ["prettier --write"]
+    "*.{ts}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md}": [
+      "prettier --write"
+    ]
   }
 }
