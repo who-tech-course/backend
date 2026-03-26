@@ -1,14 +1,14 @@
 import { Router } from 'express';
-import prisma from '../../db/prisma.js';
-import { syncBlogs } from './blog.service.js';
-import { WORKSPACE_NAME } from '../../shared/constants.js';
+import { asyncHandler } from '../../shared/http.js';
+import { syncWorkspaceBlogs } from './blog.admin.service.js';
 
 const router = Router();
 
-router.post('/blog/sync', async (_req, res) => {
-  const workspace = await prisma.workspace.findFirstOrThrow({ where: { name: WORKSPACE_NAME } });
-  const result = await syncBlogs(workspace.id);
-  res.json(result);
-});
+router.post(
+  '/blog/sync',
+  asyncHandler(async (_req, res) => {
+    res.json(await syncWorkspaceBlogs());
+  }),
+);
 
 export default router;
