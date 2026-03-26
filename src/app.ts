@@ -5,6 +5,7 @@ import { adminAuth } from './shared/middleware/auth.js';
 import workspaceRouter from './features/workspace/workspace.route.js';
 import repoRouter from './features/repo/repo.route.js';
 import syncRouter from './features/sync/sync.route.js';
+import blogRouter from './features/blog/blog.route.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -21,5 +22,6 @@ app.use('/admin', adminAuth);
 app.use('/admin/workspace', workspaceRouter);
 app.use('/admin/repos', repoRouter);
 app.use('/admin', syncRouter);
+app.use('/admin', blogRouter);
 
 export default app;

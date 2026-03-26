@@ -1,21 +1,23 @@
-name: Sync
+name: Blog Check
 
 on:
+  schedule:
+    - cron: '0 * * * *' # 매시간
   workflow_dispatch: # 수동 트리거
 
 jobs:
-  sync:
+  blog-check:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger sync
+      - name: Trigger blog sync
         run: |
           response=$(curl -s -o /dev/null -w "%{http_code}" \
-            -X POST "${{ secrets.SYNC_URL }}/admin/sync" \
+            -X POST "${{ secrets.SYNC_URL }}/admin/blog/sync" \
             -H "Authorization: Bearer ${{ secrets.ADMIN_SECRET }}")
 
           echo "Response: $response"
 
           if [ "$response" != "200" ]; then
-            echo "Sync failed with status $response"
+            echo "Blog sync failed with status $response"
             exit 1
           fi

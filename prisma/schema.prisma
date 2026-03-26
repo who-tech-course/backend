@@ -28,6 +28,7 @@ model Member {
   workspaceId Int
   workspace   Workspace    @relation(fields: [workspaceId], references: [id])
   submissions Submission[]
+  blogPosts   BlogPost[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
@@ -60,4 +61,14 @@ model Submission {
   missionRepo   MissionRepo @relation(fields: [missionRepoId], references: [id])
 
   @@unique([prNumber, missionRepoId])
+}
+
+model BlogPost {
+  id          Int      @id @default(autoincrement())
+  url         String   @unique
+  title       String
+  publishedAt DateTime
+  memberId    Int
+  member      Member   @relation(fields: [memberId], references: [id])
+  createdAt   DateTime @default(now())
 }
