@@ -123,7 +123,7 @@ export async function syncWorkspace(
 
   await prisma.workspace.update({
     where: { id: workspaceId },
-    data: { updatedAt: new Date() },
+    data: {},
   });
 
   return { totalSynced, reposSynced };

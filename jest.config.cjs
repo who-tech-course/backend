@@ -6,8 +6,9 @@ module.exports = {
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
   transform: {
-    '^.+\\.ts$': ['@swc/jest', { jsc: { target: 'es2022' } }],
+    '^.+\\.(ts|js)$': ['@swc/jest', { jsc: { target: 'es2022' } }],
   },
+  transformIgnorePatterns: ['node_modules/(?!(@octokit)/)'],
   testMatch: ['**/__tests__/**/*.test.ts'],
   collectCoverageFrom: ['src/**/*.ts', '!src/index.ts'],
 };
