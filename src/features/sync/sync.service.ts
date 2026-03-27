@@ -62,10 +62,17 @@ export function createSyncService(deps: {
     octokit: Octokit,
     workspaceId: number,
     org: string,
-    repo: { id: number; name: string; nicknameRegex?: string | null; cohortRegexRules?: string | null },
+    repo: {
+      id: number;
+      name: string;
+      track?: string | null;
+      nicknameRegex?: string | null;
+      cohortRegexRules?: string | null;
+    },
     workspaceRegex: RegExp,
     cohortRules: CohortRule[],
   ): Promise<{ synced: number }> => {
+    const isCommonMission = repo.track === null || repo.track === undefined;
     const prs = await fetchRepoPRs(octokit, org, repo.name);
     const fallbackRegex = repo.nicknameRegex ? new RegExp(repo.nicknameRegex) : workspaceRegex;
     const submissions = parsePRsToSubmissions(
@@ -79,6 +86,10 @@ export function createSyncService(deps: {
 
     for (const s of submissions) {
       const existingMember = await memberRepo.findByGithubId(s.githubId, workspaceId);
+
+      // 공통 미션: 이미 알려진 멤버에만 submission 연결
+      if (isCommonMission && !existingMember) continue;
+
       const nicknameStats = mergeNicknameStat(existingMember?.nicknameStats, s.nickname, s.submittedAt);
       const displayNickname = resolveDisplayNickname(
         existingMember?.manualNickname,
