@@ -47,21 +47,31 @@ MissionRepo (DB 등록) → fetchRepoPRs (GitHub API) → parsePRsToSubmissions 
 ### DB 스키마 핵심
 
 - `Workspace`: githubOrg, nicknameRegex(기본값), cohortRules(JSON)
-- `MissionRepo`: track(frontend|backend|android), type(individual|integration), nicknameRegex(선택)
-- `Member`: githubId, nickname, cohort, blog
+- `MissionRepo`: track(frontend|backend|android|**null=공통**), type(individual|integration), status(active|candidate|excluded), nicknameRegex(선택), cohortRegexRules(JSON)
+- `Member`: githubId, nickname, manualNickname, nicknameStats(JSON), cohort, blog
 - `Submission`: prNumber, prUrl, memberId, missionRepoId
+- `BlogPost`: url, title, publishedAt, memberId (30일 보관)
+- `BlogPostLatest`: url, title, publishedAt, memberId (7일 스냅샷, sync마다 전체 갱신)
 
 ### API 구조
 
 ```
-GET  /admin/status          — 수집 현황 (memberCount, lastSyncAt)
-GET  /admin/workspace       — workspace 설정 조회
-PUT  /admin/workspace       — nicknameRegex, cohortRules 수정
-GET  /admin/repos           — 미션 레포 목록
-POST /admin/repos           — 레포 추가 (name, repoUrl, track, type?, nicknameRegex?)
-PATCH /admin/repos/:id      — nicknameRegex 수정
-DELETE /admin/repos/:id     — 레포 + 관련 submission 트랜잭션 삭제
-POST /admin/sync            — 전체 workspace sync 수동 실행
+GET  /admin/status                    — 수집 현황 (memberCount, lastSyncAt)
+GET  /admin/workspace                 — workspace 설정 조회
+PUT  /admin/workspace                 — nicknameRegex, cohortRules 수정
+GET  /admin/repos                     — 미션 레포 목록 (?status=active|candidate|excluded)
+POST /admin/repos                     — 레포 추가 (name, repoUrl, track, type?, nicknameRegex?, cohortRegexRules?)
+POST /admin/repos/discover            — 조직 공개 레포 탐색 → candidate 갱신
+PATCH /admin/repos/:id                — track, nicknameRegex, cohortRegexRules 등 수정
+DELETE /admin/repos/:id               — 레포 + 관련 submission 트랜잭션 삭제
+POST /admin/repos/:id/sync            — 단건 레포 sync
+GET  /admin/repos/:id/detect-regex    — PR 샘플 기반 닉네임 정규식 자동 감지
+POST /admin/sync                      — 전체 workspace sync 수동 실행
+GET  /admin/members                   — 멤버 목록 (?q=&cohort=&hasBlog=)
+PATCH /admin/members/:id              — manualNickname, blog 수정
+DELETE /admin/members/:id             — 멤버 + submissions + blogPosts 삭제
+POST /admin/blog/sync                 — 블로그 RSS 전체 sync
+POST /admin/blog/backfill             — GitHub profile blog 백필 (?limit=30)
 ```
 
 모든 `/admin` 엔드포인트는 `Authorization: Bearer <ADMIN_SECRET>` 필요.
@@ -78,8 +88,9 @@ POST /admin/sync            — 전체 workspace sync 수동 실행
 
 - `test.yml` — PR 시 unit 테스트 (develop/main 대상)
 - `deploy.yml` — develop 푸시 시 SSH 자동 배포 (prisma migrate → pm2 restart)
-- `sync.yml` — 매일 KST 03:00 `POST /admin/sync` 호출, `workflow_dispatch`로 수동 트리거 가능
+- `sync.yml` — `workflow_dispatch` 수동 트리거 전용 (cron 없음)
   - Secrets 필요: `SYNC_URL` (서버 URL), `ADMIN_SECRET`
+- `blog-check.yml` — 매시간 cron `POST /admin/blog/sync` 호출 (GitHub API 미사용, RSS only)
 
 ## PR/브랜치 규칙
 

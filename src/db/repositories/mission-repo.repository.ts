@@ -13,6 +13,8 @@ export function createMissionRepoRepository(db: PrismaClient) {
 
     update: (id: number, data: Prisma.MissionRepoUpdateInput) => db.missionRepo.update({ where: { id }, data }),
 
+    touch: (id: number) => db.missionRepo.update({ where: { id }, data: { lastSyncAt: new Date() } }),
+
     count: () => db.missionRepo.count(),
 
     deleteWithSubmissions: (id: number) =>

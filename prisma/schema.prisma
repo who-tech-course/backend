@@ -29,8 +29,9 @@ model Member {
   blog        String?
   workspaceId Int
   workspace   Workspace    @relation(fields: [workspaceId], references: [id])
-  submissions Submission[]
-  blogPosts   BlogPost[]
+  submissions      Submission[]
+  blogPosts        BlogPost[]
+  blogPostsLatest  BlogPostLatest[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
@@ -49,6 +50,8 @@ model MissionRepo {
   candidateReason String?
   nicknameRegex String?      // null이면 Workspace.nicknameRegex fallback
   cohortRegexRules String?   // JSON: [{"cohort": 7, "nicknameRegex": "..."}, ...]
+  syncMode      String       @default("continuous") // continuous | once
+  lastSyncAt    DateTime?
   workspaceId   Int
   workspace     Workspace    @relation(fields: [workspaceId], references: [id])
   submissions   Submission[]
@@ -78,4 +81,14 @@ model BlogPost {
   memberId    Int
   member      Member   @relation(fields: [memberId], references: [id])
   createdAt   DateTime @default(now())
+}
+
+// 최근 7일치 스냅샷 — sync마다 갱신
+model BlogPostLatest {
+  id          Int      @id @default(autoincrement())
+  url         String   @unique
+  title       String
+  publishedAt DateTime
+  memberId    Int
+  member      Member   @relation(fields: [memberId], references: [id])
 }

@@ -39,6 +39,7 @@ export function createBlogService(deps: { memberRepo: MemberRepository; blogPost
 
   return {
     syncBlogs: async (workspaceId: number): Promise<{ synced: number; deleted: number }> => {
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
       const members = await memberRepo.findMany({
         where: { workspaceId, blog: { not: null } },
@@ -50,7 +51,7 @@ export function createBlogService(deps: { memberRepo: MemberRepository; blogPost
         for (const item of await fetchRSSItems(member.blog!)) {
           if (!item.link || !item.title || !item.pubDate) continue;
           const publishedAt = new Date(item.pubDate);
-          if (isNaN(publishedAt.getTime()) || publishedAt < sevenDaysAgo) continue;
+          if (isNaN(publishedAt.getTime()) || publishedAt < thirtyDaysAgo) continue;
           await blogPostRepo.upsert({
             where: { url: item.link },
             create: { url: item.link, title: item.title, publishedAt, memberId: member.id },
@@ -60,7 +61,8 @@ export function createBlogService(deps: { memberRepo: MemberRepository; blogPost
         }
       }
 
-      const { count: deleted } = await blogPostRepo.deleteBefore(sevenDaysAgo);
+      const { count: deleted } = await blogPostRepo.deleteBefore(thirtyDaysAgo);
+      await blogPostRepo.refreshLatest(sevenDaysAgo);
       return { synced, deleted };
     },
   };

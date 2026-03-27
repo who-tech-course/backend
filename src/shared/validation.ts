@@ -54,6 +54,7 @@ export function parseRepoCreateInput(body: unknown): {
   track: string | null;
   type?: string;
   status?: string;
+  syncMode?: string;
   candidateReason?: string | null;
   nicknameRegex?: string;
   cohortRegexRules?: CohortRegexRule[];
@@ -70,6 +71,7 @@ export function parseRepoCreateInput(body: unknown): {
     track,
     type,
     status,
+    syncMode,
     candidateReason,
     nicknameRegex,
     cohortRegexRules,
@@ -99,6 +101,10 @@ export function parseRepoCreateInput(body: unknown): {
     badRequest('invalid status');
   }
 
+  if (syncMode !== undefined && typeof syncMode !== 'string') {
+    badRequest('invalid syncMode');
+  }
+
   if (candidateReason !== undefined && candidateReason !== null && typeof candidateReason !== 'string') {
     badRequest('invalid candidateReason');
   }
@@ -119,6 +125,7 @@ export function parseRepoCreateInput(body: unknown): {
     track: track ?? null,
     ...(type !== undefined ? { type } : {}),
     ...(status !== undefined ? { status } : {}),
+    ...(syncMode !== undefined ? { syncMode } : {}),
     ...(candidateReason !== undefined ? { candidateReason } : {}),
     ...(nicknameRegex !== undefined ? { nicknameRegex } : {}),
     ...(cohortRegexRules !== undefined ? { cohortRegexRules } : {}),
@@ -130,6 +137,7 @@ export function parseRepoUpdateInput(body: unknown): {
   track?: string | null;
   type?: string;
   status?: string;
+  syncMode?: string;
   candidateReason?: string | null;
   nicknameRegex?: string | null;
   cohortRegexRules?: CohortRegexRule[] | null;
@@ -138,7 +146,7 @@ export function parseRepoUpdateInput(body: unknown): {
     badRequest('invalid body');
   }
 
-  const { description, track, type, status, candidateReason, nicknameRegex, cohortRegexRules } = body;
+  const { description, track, type, status, syncMode, candidateReason, nicknameRegex, cohortRegexRules } = body;
 
   if (description !== undefined && description !== null && typeof description !== 'string') {
     badRequest('invalid description');
@@ -154,6 +162,10 @@ export function parseRepoUpdateInput(body: unknown): {
 
   if (status !== undefined && typeof status !== 'string') {
     badRequest('invalid status');
+  }
+
+  if (syncMode !== undefined && typeof syncMode !== 'string') {
+    badRequest('invalid syncMode');
   }
 
   if (candidateReason !== undefined && candidateReason !== null && typeof candidateReason !== 'string') {
@@ -173,6 +185,7 @@ export function parseRepoUpdateInput(body: unknown): {
     ...(track !== undefined ? { track } : {}),
     ...(type !== undefined ? { type } : {}),
     ...(status !== undefined ? { status } : {}),
+    ...(syncMode !== undefined ? { syncMode } : {}),
     ...(candidateReason !== undefined ? { candidateReason } : {}),
     ...(nicknameRegex !== undefined ? { nicknameRegex } : {}),
     ...(cohortRegexRules !== undefined ? { cohortRegexRules } : {}),

@@ -2,7 +2,7 @@ import type { PrismaClient, Prisma } from '@prisma/client';
 
 const memberWithRelationsInclude = {
   _count: { select: { submissions: true } },
-  blogPosts: { orderBy: { publishedAt: 'desc' as const }, take: 5 },
+  blogPostsLatest: { orderBy: { publishedAt: 'desc' as const } },
   submissions: {
     orderBy: { submittedAt: 'desc' as const },
     include: { missionRepo: { select: { name: true, track: true } } },
