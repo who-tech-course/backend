@@ -53,78 +53,79 @@
         <div class="sub" id="sync-result">준비됨</div>
       </div>
 
-      <div class="split" style="margin-top: 16px">
-        <div class="card">
-          <div class="section-head">
-            <div>
-              <h2>Repo Candidates</h2>
-              <div class="sub">woowacourse 조직에서 미션 레포 후보를 불러오고 활성/제외를 관리합니다.</div>
-            </div>
-            <div class="actions">
-              <button class="btn-primary" id="discover-btn" onclick="discoverRepos()">후보 불러오기</button>
-            </div>
+      <div class="card" style="margin-top: 16px">
+        <div class="section-head">
+          <div>
+            <h2>Repo Candidates</h2>
+            <div class="sub">woowacourse 조직에서 미션 레포 후보를 불러오고 활성/제외를 관리합니다.</div>
           </div>
-
-          <div class="toolbar">
-            <input id="repo-search" placeholder="레포 이름 검색" oninput="renderRepos()" />
-            <select id="repo-status-filter" onchange="renderRepos()">
-              <option value="">모든 상태</option>
-              <option value="active">active</option>
-              <option value="candidate">candidate</option>
-              <option value="excluded">excluded</option>
-            </select>
-            <select id="repo-track-filter" onchange="renderRepos()">
-              <option value="">모든 트랙</option>
-              <option value="frontend">frontend</option>
-              <option value="backend">backend</option>
-              <option value="android">android</option>
-            </select>
-          </div>
-
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>이름</th>
-                  <th>상태</th>
-                  <th>트랙/타입</th>
-                  <th>설명 / 후보 사유</th>
-                  <th>정규식</th>
-                  <th>작업</th>
-                </tr>
-              </thead>
-              <tbody id="repo-table-body"></tbody>
-            </table>
+          <div class="actions">
+            <button class="btn-primary" id="discover-btn" onclick="discoverRepos()">후보 불러오기</button>
           </div>
         </div>
 
-        <div class="card">
-          <h2>Manual Repo Add</h2>
-          <div class="sub" style="margin-bottom: 12px">후보에 안 잡히는 레포는 직접 추가할 수 있습니다.</div>
-          <div class="form-grid">
-            <input type="text" id="repo-name" placeholder="레포 이름" />
-            <input type="text" id="repo-url" placeholder="레포 URL" />
-            <input type="text" id="repo-description" placeholder="설명 (선택)" />
-            <select id="repo-track">
-              <option value="frontend">frontend</option>
-              <option value="backend">backend</option>
-              <option value="android">android</option>
-            </select>
-            <select id="repo-type">
-              <option value="individual">individual</option>
-              <option value="integration">integration</option>
-            </select>
-            <select id="repo-status">
-              <option value="active">active</option>
-              <option value="candidate">candidate</option>
-              <option value="excluded">excluded</option>
-            </select>
-            <input type="text" id="repo-regex" placeholder="기본 닉네임 정규식" />
-            <textarea id="repo-cohort-regex-rules" placeholder='기수별 정규식 JSON [{"cohort":7,"nicknameRegex":"..."}]'></textarea>
-          </div>
-          <div style="margin-top: 10px">
-            <button class="btn-primary" onclick="addRepo()">레포 추가</button>
-          </div>
+        <div class="tabs">
+          <button class="tab active" id="tab-base" onclick="setRepoTab('base')">기준 레포</button>
+          <button class="tab" id="tab-common" onclick="setRepoTab('common')">공통 미션</button>
+        </div>
+
+        <div class="toolbar">
+          <input id="repo-search" placeholder="레포 이름 검색" oninput="renderRepos()" />
+          <select id="repo-status-filter" onchange="renderRepos()">
+            <option value="">모든 상태</option>
+            <option value="active">active</option>
+            <option value="candidate">candidate</option>
+            <option value="excluded">excluded</option>
+          </select>
+          <select id="repo-track-filter" onchange="renderRepos()">
+            <option value="">모든 트랙</option>
+            <option value="frontend">frontend</option>
+            <option value="backend">backend</option>
+            <option value="android">android</option>
+          </select>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>이름</th>
+                <th>상태</th>
+                <th>트랙/타입</th>
+                <th>설명 / 후보 사유</th>
+                <th>정규식</th>
+                <th>작업</th>
+              </tr>
+            </thead>
+            <tbody id="repo-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 16px">
+        <h2>Manual Repo Add</h2>
+        <div class="sub" style="margin-bottom: 12px">후보에 안 잡히는 레포는 직접 추가할 수 있습니다.</div>
+        <div class="form-inline">
+          <input type="text" id="repo-name" placeholder="레포 이름" />
+          <input type="text" id="repo-url" placeholder="레포 URL" />
+          <input type="text" id="repo-description" placeholder="설명 (선택)" />
+          <select id="repo-track">
+            <option value="">트랙 없음(공통)</option>
+            <option value="frontend">frontend</option>
+            <option value="backend">backend</option>
+            <option value="android">android</option>
+          </select>
+          <select id="repo-type">
+            <option value="individual">individual</option>
+            <option value="integration">integration</option>
+          </select>
+          <select id="repo-status">
+            <option value="active">active</option>
+            <option value="candidate">candidate</option>
+            <option value="excluded">excluded</option>
+          </select>
+          <input type="text" id="repo-regex" placeholder="닉네임 정규식" />
+          <button class="btn-primary" onclick="addRepo()">추가</button>
         </div>
       </div>
 

@@ -3,6 +3,7 @@ let token = '';
 let repoList = [];
 let memberList = [];
 let memberSearchTimer = null;
+let repoTab = 'base';
 
 function login() {
   token = document.getElementById('secret-input').value;
@@ -57,12 +58,25 @@ function loadRepos() {
     });
 }
 
+function setRepoTab(tab) {
+  repoTab = tab;
+  document.getElementById('tab-base').classList.toggle('active', tab === 'base');
+  document.getElementById('tab-common').classList.toggle('active', tab === 'common');
+  const trackFilter = document.getElementById('repo-track-filter');
+  trackFilter.style.display = tab === 'common' ? 'none' : '';
+  renderRepos();
+}
+
 function renderRepos() {
   const search = document.getElementById('repo-search').value.trim().toLowerCase();
   const status = document.getElementById('repo-status-filter').value;
   const track = document.getElementById('repo-track-filter').value;
 
   const filtered = repoList.filter((repo) => {
+    const isCommon = repo.track === null;
+    if (repoTab === 'base' && isCommon) return false;
+    if (repoTab === 'common' && !isCommon) return false;
+
     if (search && !repo.name.toLowerCase().includes(search)) {
       return false;
     }
@@ -140,7 +154,7 @@ function addRepo() {
     name: document.getElementById('repo-name').value.trim(),
     repoUrl: document.getElementById('repo-url').value.trim(),
     description: document.getElementById('repo-description').value.trim() || null,
-    track: document.getElementById('repo-track').value,
+    track: document.getElementById('repo-track').value || null,
     type: document.getElementById('repo-type').value,
     status: document.getElementById('repo-status').value,
     nicknameRegex: document.getElementById('repo-regex').value.trim() || null,
