@@ -51,7 +51,7 @@ export function parseRepoCreateInput(body: unknown): {
   name: string;
   repoUrl: string;
   description?: string | null;
-  track: string;
+  track: string | null;
   type?: string;
   status?: string;
   candidateReason?: string | null;
@@ -79,8 +79,12 @@ export function parseRepoCreateInput(body: unknown): {
     badRequest('invalid githubRepoId');
   }
 
-  if (typeof name !== 'string' || typeof repoUrl !== 'string' || typeof track !== 'string') {
+  if (typeof name !== 'string' || typeof repoUrl !== 'string') {
     badRequest('invalid repo payload');
+  }
+
+  if (track !== undefined && track !== null && typeof track !== 'string') {
+    badRequest('invalid track');
   }
 
   if (description !== undefined && description !== null && typeof description !== 'string') {
@@ -112,7 +116,7 @@ export function parseRepoCreateInput(body: unknown): {
     name,
     repoUrl,
     ...(description !== undefined ? { description } : {}),
-    track,
+    track: track ?? null,
     ...(type !== undefined ? { type } : {}),
     ...(status !== undefined ? { status } : {}),
     ...(candidateReason !== undefined ? { candidateReason } : {}),
@@ -123,7 +127,7 @@ export function parseRepoCreateInput(body: unknown): {
 
 export function parseRepoUpdateInput(body: unknown): {
   description?: string | null;
-  track?: string;
+  track?: string | null;
   type?: string;
   status?: string;
   candidateReason?: string | null;
@@ -140,7 +144,7 @@ export function parseRepoUpdateInput(body: unknown): {
     badRequest('invalid description');
   }
 
-  if (track !== undefined && typeof track !== 'string') {
+  if (track !== undefined && track !== null && typeof track !== 'string') {
     badRequest('invalid track');
   }
 

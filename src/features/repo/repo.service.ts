@@ -34,7 +34,7 @@ export function createRepoService(deps: {
       name: string;
       repoUrl: string;
       description?: string | null;
-      track: string;
+      track: string | null;
       type?: string;
       status?: string;
       candidateReason?: string | null;
@@ -62,7 +62,7 @@ export function createRepoService(deps: {
       id: number,
       input: {
         description?: string | null;
-        track?: string;
+        track?: string | null;
         type?: string;
         status?: string;
         candidateReason?: string | null;
@@ -115,7 +115,7 @@ export function createRepoService(deps: {
             githubRepoId: candidate.githubRepoId,
             repoUrl: candidate.repoUrl,
             description: candidate.description,
-            track: existing.track || candidate.track,
+            track: existing.track ?? candidate.track,
             type: existing.type || candidate.type,
             candidateReason: candidate.candidateReason,
             ...(existing.status === 'excluded' ? {} : { status: existing.status }),

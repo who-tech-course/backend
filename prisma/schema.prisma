@@ -43,7 +43,7 @@ model MissionRepo {
   name          String
   repoUrl       String
   description   String?
-  track         String       // frontend | backend | android
+  track         String?      // frontend | backend | android | null(공통 미션)
   type          String       @default("individual") // individual | integration
   status        String       @default("active") // active | candidate | excluded
   candidateReason String?

@@ -9,7 +9,7 @@ export function createMemberService(deps: { memberRepo: MemberRepository; worksp
   const toResponse = (member: Awaited<ReturnType<MemberRepository['findWithFilters']>>[number]) => ({
     ...member,
     nickname: resolveDisplayNickname(member.manualNickname, member.nicknameStats, member.nickname),
-    tracks: [...new Set(member.submissions.map((s) => s.missionRepo.track))],
+    tracks: [...new Set(member.submissions.map((s) => s.missionRepo.track).filter((t) => t !== null))],
   });
 
   return {

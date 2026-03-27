@@ -14,7 +14,7 @@ export type DiscoveredMissionRepo = {
   name: string;
   repoUrl: string;
   description: string | null;
-  track: string;
+  track: string | null;
   type: string;
   candidateReason: string;
 };
@@ -93,25 +93,21 @@ function classifyMissionRepo(repo: OrgRepo): DiscoveredMissionRepo | null {
   };
 }
 
-function inferTrack(name: string): string {
-  if (
-    name.startsWith('javascript-') ||
-    name.startsWith('react-') ||
-    name.startsWith('ts-') ||
-    name.includes('rendering') ||
-    name.includes('airline') ||
-    name.includes('basecamp') ||
-    name.includes('canvas') ||
-    name.includes('gemini')
-  ) {
+function inferTrack(name: string): string | null {
+  if (name.startsWith('javascript-') || name.startsWith('react-') || name.startsWith('ts-')) {
     return 'frontend';
   }
 
-  if (name.startsWith('android-') || name.includes('rss-reader')) {
+  if (name.startsWith('java-') || name.startsWith('spring-') || name.startsWith('jwp-')) {
+    return 'backend';
+  }
+
+  if (name.startsWith('android-') || name.startsWith('kotlin-')) {
     return 'android';
   }
 
-  return 'backend';
+  // 공통/협업 미션 (언어 prefix 없음) — track 미지정
+  return null;
 }
 
 function inferType(name: string): string {
