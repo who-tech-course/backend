@@ -8,15 +8,16 @@ datasource db {
 }
 
 model Workspace {
-  id            Int           @id @default(autoincrement())
-  name          String        @unique
-  githubOrg     String
-  nicknameRegex String
-  cohortRules   String        // JSON: [{"year": 2026, "cohort": 8}, ...]
-  members       Member[]
-  missionRepos  MissionRepo[]
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id              Int           @id @default(autoincrement())
+  name            String        @unique
+  githubOrg       String
+  nicknameRegex   String
+  cohortRules     String        // JSON: [{"year": 2026, "cohort": 8}, ...]
+  blogSyncEnabled Boolean       @default(true)
+  members         Member[]
+  missionRepos    MissionRepo[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 }
 
 model Member {

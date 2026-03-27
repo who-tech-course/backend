@@ -15,6 +15,9 @@ export function createBlogAdminService(deps: {
   return {
     syncWorkspaceBlogs: async () => {
       const workspace = await workspaceService.getOrThrow();
+      if (!workspace.blogSyncEnabled) {
+        return { synced: 0, deleted: 0, skipped: true };
+      }
       return blogService.syncBlogs(workspace.id);
     },
 

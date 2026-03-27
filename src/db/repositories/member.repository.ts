@@ -11,13 +11,17 @@ const memberWithRelationsInclude = {
 
 export function createMemberRepository(db: PrismaClient) {
   return {
-    findWithFilters: (workspaceId: number, filters?: { q?: string; cohort?: number; hasBlog?: boolean }) =>
+    findWithFilters: (
+      workspaceId: number,
+      filters?: { q?: string; cohort?: number; hasBlog?: boolean; track?: string },
+    ) =>
       db.member.findMany({
         where: {
           workspaceId,
           ...(filters?.cohort ? { cohort: filters.cohort } : {}),
           ...(filters?.hasBlog === true ? { blog: { not: null } } : {}),
           ...(filters?.hasBlog === false ? { blog: null } : {}),
+          ...(filters?.track ? { submissions: { some: { missionRepo: { track: filters.track } } } } : {}),
           ...(filters?.q
             ? {
                 OR: [

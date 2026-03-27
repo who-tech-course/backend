@@ -46,6 +46,7 @@
           <div class="actions">
             <button class="btn-secondary" id="blog-backfill-btn" onclick="triggerBlogBackfill()">블로그 링크 백필</button>
             <button class="btn-secondary" id="blog-sync-btn" onclick="triggerBlogSync()">블로그 Sync</button>
+            <button class="btn-toggle" id="blog-sync-toggle" onclick="toggleBlogSync()">블로그 자동수집 ON</button>
             <button class="btn-primary" id="sync-btn" onclick="triggerSync()">전체 Sync</button>
             <button class="btn-primary" id="ts-learning-sync-btn" onclick="triggerTsAndLearningTest()">ts-and-learning 테스트</button>
           </div>
@@ -86,7 +87,7 @@
           </select>
         </div>
 
-        <div class="repo-section-label">계속 돌릴 레포 <span class="sub">(매 sync 실행)</span></div>
+        <div class="repo-section-label">계속 돌릴 레포 <span class="sub">(매 sync 실행 / 후보 포함)</span></div>
         <div class="table-wrap">
           <table>
             <thead>
@@ -170,6 +171,12 @@
             <option value="7">7기</option>
             <option value="6">6기</option>
             <option value="5">5기</option>
+          </select>
+          <select id="member-track-filter" onchange="loadMembers()">
+            <option value="">모든 트랙</option>
+            <option value="frontend">frontend</option>
+            <option value="backend">backend</option>
+            <option value="android">android</option>
           </select>
           <select id="member-blog-filter" onchange="loadMembers()">
             <option value="">블로그 전체</option>

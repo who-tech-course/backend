@@ -13,7 +13,7 @@ export function createMemberService(deps: { memberRepo: MemberRepository; worksp
   });
 
   return {
-    listMembers: async (filters?: { q?: string; cohort?: number; hasBlog?: boolean }) => {
+    listMembers: async (filters?: { q?: string; cohort?: number; hasBlog?: boolean; track?: string }) => {
       const workspace = await workspaceService.getOrThrow();
       const members = await memberRepo.findWithFilters(workspace.id, filters);
       return members.map(toResponse);

@@ -6,6 +6,7 @@ let memberSearchTimer = null;
 let repoTab = 'base';
 let regexModalRepoId = null;
 let regexModalResult = null;
+let regexModalMode = 'detect'; // 'detect' | 'edit'
 
 function login() {
   token = document.getElementById('secret-input').value;
@@ -48,7 +49,32 @@ function loadWorkspace() {
     .then((data) => {
       document.getElementById('nickname-regex').value = data.nicknameRegex;
       document.getElementById('cohort-rules').value = JSON.stringify(data.cohortRules, null, 2);
+      updateBlogSyncToggle(data.blogSyncEnabled);
     });
+}
+
+function updateBlogSyncToggle(enabled) {
+  const btn = document.getElementById('blog-sync-toggle');
+  if (!btn) return;
+  btn.textContent = enabled ? '블로그 자동수집 ON' : '블로그 자동수집 OFF';
+  btn.classList.toggle('active', enabled);
+}
+
+function toggleBlogSync() {
+  fetch('/admin/workspace', { headers: authHeaders() })
+    .then((res) => res.json())
+    .then((data) => {
+      const next = !data.blogSyncEnabled;
+      return fetch('/admin/workspace', {
+        method: 'PUT',
+        headers: authHeaders('application/json'),
+        body: JSON.stringify({ blogSyncEnabled: next }),
+      }).then(() => {
+        updateBlogSyncToggle(next);
+        toast(`블로그 자동수집 ${next ? 'ON' : 'OFF'}`);
+      });
+    })
+    .catch(() => toast('설정 변경 실패'));
 }
 
 function loadRepos() {
@@ -71,6 +97,7 @@ function setRepoTab(tab) {
 
 function repoRow(repo) {
   const syncedAt = repo.lastSyncAt ? new Date(repo.lastSyncAt).toLocaleString('ko-KR') : '없음';
+  const regexText = escapeHtml(formatRepoRegex(repo));
   return `
     <tr>
       <td>
@@ -92,7 +119,7 @@ function repoRow(repo) {
           <span class="muted">${escapeHtml(repo.candidateReason ?? '-')}</span>
         </div>
       </td>
-      <td class="mono">${escapeHtml(formatRepoRegex(repo))}</td>
+      <td class="mono" style="cursor:pointer" onclick="editRepoRegex(${repo.id})" title="클릭해서 정규식 수정">${regexText || '<span class="muted">없음</span>'}</td>
       <td class="muted small">${syncedAt}</td>
       <td>
         <div class="actions">
@@ -134,6 +161,19 @@ function renderRepos() {
   tbodyOnce.innerHTML = once.length
     ? once.map(repoRow).join('')
     : `<tr><td colspan="7" class="muted">없음</td></tr>`;
+}
+
+function activateRepo(id, syncMode) {
+  fetch(`/admin/repos/${id}`, {
+    method: 'PATCH',
+    headers: authHeaders('application/json'),
+    body: JSON.stringify({ status: 'active', syncMode }),
+  })
+    .then(() => {
+      toast(`레포 활성화 완료 (${syncMode === 'once' ? '한 번만' : '계속'})`);
+      return loadRepos();
+    })
+    .catch(() => alert('활성화에 실패했습니다.'));
 }
 
 function discoverRepos() {
@@ -191,6 +231,36 @@ function addRepo() {
       return loadRepos();
     })
     .catch(() => alert('레포 추가에 실패했습니다.'));
+}
+
+function editRepoRegex(id) {
+  const repo = repoList.find((item) => item.id === id);
+  if (!repo) return;
+
+  regexModalRepoId = id;
+  regexModalResult = null;
+  regexModalMode = 'edit';
+
+  const modal = document.getElementById('regex-modal');
+  const body = document.getElementById('regex-modal-body');
+  const applyBtn = document.getElementById('regex-apply-btn');
+  const title = document.getElementById('regex-modal-title');
+
+  title.textContent = `정규식 수정 — ${repo.name}`;
+  applyBtn.disabled = false;
+
+  const cohortVal = repo.cohortRegexRules?.length ? JSON.stringify(repo.cohortRegexRules, null, 2) : '';
+  body.innerHTML = `
+    <div style="margin-bottom:16px;">
+      <label style="display:block;margin-bottom:4px;font-size:13px;">기본 닉네임 정규식</label>
+      <input type="text" id="edit-regex-nickname" value="${escapeHtml(repo.nicknameRegex ?? '')}" placeholder="없으면 workspace 기본값 사용" style="width:100%" />
+    </div>
+    <div>
+      <label style="display:block;margin-bottom:4px;font-size:13px;">기수별 정규식 JSON</label>
+      <textarea id="edit-regex-cohort" rows="5" placeholder='[{"cohort":7,"nicknameRegex":"..."}]' style="width:100%;font-family:monospace">${escapeHtml(cohortVal)}</textarea>
+    </div>
+  `;
+  modal.style.display = 'flex';
 }
 
 function editRepo(id) {
@@ -358,11 +428,13 @@ function triggerBlogBackfill() {
 function loadMembers() {
   const q = document.getElementById('member-search').value.trim();
   const cohort = document.getElementById('member-cohort-filter').value;
+  const track = document.getElementById('member-track-filter').value;
   const hasBlog = document.getElementById('member-blog-filter').value;
   const params = new URLSearchParams();
 
   if (q) params.set('q', q);
   if (cohort) params.set('cohort', cohort);
+  if (track) params.set('track', track);
   if (hasBlog) params.set('hasBlog', hasBlog);
 
   return fetch(`/admin/members?${params.toString()}`, { headers: authHeaders() })
@@ -447,7 +519,22 @@ function renderMembers() {
     </tr>
   `).join('');
 
-  summary.textContent = `총 ${memberList.length}명`;
+  const cohortCounts = {};
+  for (const m of memberList) {
+    const key = m.cohort ? `${m.cohort}기` : '기수 미상';
+    cohortCounts[key] = (cohortCounts[key] ?? 0) + 1;
+  }
+  const cohortSummary = Object.entries(cohortCounts)
+    .sort((a, b) => {
+      const an = parseInt(a[0]);
+      const bn = parseInt(b[0]);
+      if (isNaN(an)) return 1;
+      if (isNaN(bn)) return -1;
+      return bn - an;
+    })
+    .map(([k, v]) => `${k} ${v}명`)
+    .join(' · ');
+  summary.textContent = `총 ${memberList.length}명` + (cohortSummary ? `  |  ${cohortSummary}` : '');
 }
 
 function editMember(id) {
@@ -546,6 +633,7 @@ function toast(message) {
 function detectRepoRegex(id) {
   regexModalRepoId = id;
   regexModalResult = null;
+  regexModalMode = 'detect';
 
   const modal = document.getElementById('regex-modal');
   const body = document.getElementById('regex-modal-body');
@@ -610,27 +698,38 @@ function closeRegexModal() {
 }
 
 function applyDetectedRegex() {
-  if (!regexModalRepoId || !regexModalResult) return;
+  if (!regexModalRepoId) return;
 
-  const suggestionInput = document.getElementById('suggestion-regex-input');
-  const nicknameRegex = suggestionInput ? suggestionInput.value.trim() || null : null;
+  let payload;
 
-  const cohortInputs = document.querySelectorAll('.cohort-regex-input');
-  const cohortRegexRules = [];
-  cohortInputs.forEach((input) => {
-    const cohortAttr = input.getAttribute('data-cohort');
-    if (!cohortAttr) return;
-    const cohort = parseInt(cohortAttr, 10);
-    const regex = input.value.trim();
-    if (!isNaN(cohort) && regex) {
-      cohortRegexRules.push({ cohort, nicknameRegex: regex });
+  if (regexModalMode === 'edit') {
+    const nicknameRegex = document.getElementById('edit-regex-nickname').value.trim() || null;
+    const cohortRaw = document.getElementById('edit-regex-cohort').value.trim();
+    let cohortRegexRules = null;
+    if (cohortRaw) {
+      try {
+        cohortRegexRules = JSON.parse(cohortRaw);
+      } catch {
+        alert('기수별 정규식 JSON 형식이 올바르지 않습니다.');
+        return;
+      }
     }
-  });
-
-  const payload = {
-    nicknameRegex,
-    cohortRegexRules: cohortRegexRules.length > 0 ? cohortRegexRules : null,
-  };
+    payload = { nicknameRegex, cohortRegexRules };
+  } else {
+    if (!regexModalResult) return;
+    const suggestionInput = document.getElementById('suggestion-regex-input');
+    const nicknameRegex = suggestionInput ? suggestionInput.value.trim() || null : null;
+    const cohortInputs = document.querySelectorAll('.cohort-regex-input');
+    const cohortRegexRules = [];
+    cohortInputs.forEach((input) => {
+      const cohortAttr = input.getAttribute('data-cohort');
+      if (!cohortAttr) return;
+      const cohort = parseInt(cohortAttr, 10);
+      const regex = input.value.trim();
+      if (!isNaN(cohort) && regex) cohortRegexRules.push({ cohort, nicknameRegex: regex });
+    });
+    payload = { nicknameRegex, cohortRegexRules: cohortRegexRules.length > 0 ? cohortRegexRules : null };
+  }
 
   fetch(`/admin/repos/${regexModalRepoId}`, {
     method: 'PATCH',
@@ -642,11 +741,11 @@ function applyDetectedRegex() {
       return response.json();
     })
     .then(() => {
-      toast('정규식 적용 완료');
+      toast('정규식 저장 완료');
       closeRegexModal();
       return loadRepos();
     })
-    .catch(() => alert('정규식 적용에 실패했습니다.'));
+    .catch(() => alert('정규식 저장에 실패했습니다.'));
 }
 
 document.getElementById('secret-input').addEventListener('keydown', (event) => {

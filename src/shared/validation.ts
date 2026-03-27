@@ -25,12 +25,13 @@ export function parseNullableString(value: unknown, fieldName: string): string |
 export function parseWorkspaceUpdateInput(body: unknown): {
   nicknameRegex?: string;
   cohortRules?: CohortRule[];
+  blogSyncEnabled?: boolean;
 } {
   if (!isRecord(body)) {
     badRequest('invalid body');
   }
 
-  const { nicknameRegex, cohortRules } = body;
+  const { nicknameRegex, cohortRules, blogSyncEnabled } = body;
 
   if (nicknameRegex !== undefined && typeof nicknameRegex !== 'string') {
     badRequest('invalid nicknameRegex');
@@ -40,9 +41,14 @@ export function parseWorkspaceUpdateInput(body: unknown): {
     badRequest('invalid cohortRules');
   }
 
+  if (blogSyncEnabled !== undefined && typeof blogSyncEnabled !== 'boolean') {
+    badRequest('invalid blogSyncEnabled');
+  }
+
   return {
     ...(nicknameRegex !== undefined ? { nicknameRegex } : {}),
     ...(cohortRules !== undefined ? { cohortRules } : {}),
+    ...(blogSyncEnabled !== undefined ? { blogSyncEnabled } : {}),
   };
 }
 

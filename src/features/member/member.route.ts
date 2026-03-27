@@ -12,11 +12,13 @@ export function createMemberRouter(service: MemberService) {
       const q = typeof req.query['q'] === 'string' ? req.query['q'] : undefined;
       const cohort = typeof req.query['cohort'] === 'string' ? Number(req.query['cohort']) : undefined;
       const hasBlog = req.query['hasBlog'] === 'true' ? true : req.query['hasBlog'] === 'false' ? false : undefined;
+      const track = typeof req.query['track'] === 'string' ? req.query['track'] : undefined;
       res.json(
         await service.listMembers({
           ...(q ? { q } : {}),
           ...(cohort && !Number.isNaN(cohort) ? { cohort } : {}),
           ...(hasBlog !== undefined ? { hasBlog } : {}),
+          ...(track ? { track } : {}),
         }),
       );
     }),

@@ -48,6 +48,8 @@ button:hover { transform: translateY(-1px); }
 .btn-secondary { background: #e2e8f0; color: #1e293b; }
 .btn-danger { background: #dc2626; color: #fff; }
 .btn-ghost { background: #f8fafc; color: #334155; border: 1px solid #d8dee9; }
+.btn-toggle { background: #fee2e2; color: #991b1b; }
+.btn-toggle.active { background: #dcfce7; color: #166534; }
 .btn-sm { padding: 7px 10px; font-size: 12px; border-radius: 8px; }
 button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 .pill {
