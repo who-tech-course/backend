@@ -1,5 +1,6 @@
 import { Octokit } from '@octokit/rest';
 import type { CohortRule } from '../../shared/types/index.js';
+import { normalizeBlogUrl } from '../../shared/blog.js';
 import { normalizeNickname } from '../../shared/nickname.js';
 
 export function parseNickname(title: string, regex: RegExp): string | null {
@@ -49,5 +50,5 @@ export async function fetchRepoPRs(
 
 export async function fetchUserBlogUrl(octokit: Octokit, username: string): Promise<string | null> {
   const { data } = await octokit.users.getByUsername({ username });
-  return data.blog?.trim() ? data.blog.trim() : null;
+  return normalizeBlogUrl(data.blog);
 }

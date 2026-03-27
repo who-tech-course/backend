@@ -169,7 +169,7 @@ describe('멤버 관리', () => {
       .set('Authorization', `Bearer ${ADMIN_SECRET}`)
       .send({
         manualNickname: '빌리',
-        blog: 'https://iftype.github.io',
+        blog: 'iftype.github.io',
       });
 
     expect(res.status).toBe(200);

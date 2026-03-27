@@ -160,6 +160,7 @@
             <div class="sub">전체 sync와 단건 테스트를 여기서 실행합니다.</div>
           </div>
           <div class="actions">
+            <button class="btn-secondary" id="blog-backfill-btn" onclick="triggerBlogBackfill()">블로그 링크 백필</button>
             <button class="btn-secondary" id="blog-sync-btn" onclick="triggerBlogSync()">블로그 Sync</button>
             <button class="btn-primary" id="sync-btn" onclick="triggerSync()">전체 Sync</button>
             <button class="btn-primary" id="ts-learning-sync-btn" onclick="triggerTsAndLearningTest()">ts-and-learning 테스트</button>
@@ -600,6 +601,28 @@
           .finally(() => {
             button.disabled = false;
             button.textContent = '블로그 Sync';
+          });
+      }
+
+      function triggerBlogBackfill() {
+        const button = document.getElementById('blog-backfill-btn');
+        button.disabled = true;
+        button.textContent = '조회 중...';
+        fetch('/admin/blog/backfill?limit=30', { method: 'POST', headers: authHeaders() })
+          .then((response) => response.json())
+          .then((data) => {
+            const failureText = data.failures.length > 0
+              ? ` / 실패 예시: ${data.failures.map((item) => `${item.githubId}(${item.reason})`).join(', ')}`
+              : '';
+            document.getElementById('sync-result').textContent =
+              `블로그 링크 확인 ${data.checked}명, 저장 ${data.updated}명, 비어 있음 ${data.missing}명, 실패 ${data.failed}명${failureText}`;
+            toast(`블로그 링크 백필 완료 (${data.updated}명 저장)`);
+            return loadMembers();
+          })
+          .catch(() => toast('블로그 링크 백필 실패'))
+          .finally(() => {
+            button.disabled = false;
+            button.textContent = '블로그 링크 백필';
           });
       }
 
