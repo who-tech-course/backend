@@ -11,27 +11,53 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
+    "test:unit": "NODE_OPTIONS=--experimental-vm-modules jest __tests__/unit",
+    "test:integration": "NODE_OPTIONS=--experimental-vm-modules jest __tests__/integration",
+    "test:watch": "NODE_OPTIONS=--experimental-vm-modules jest --watch",
+    "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage",
+    "seed": "tsx src/db/seed.ts"
   },
   "dependencies": {
-    "express": "^4.21.2"
+    "@octokit/rest": "^22.0.1",
+    "@prisma/client": "^6.19.2",
+    "express": "^4.21.2",
+    "node-cron": "^4.2.1",
+    "prisma": "^6.19.2",
+    "rss-parser": "^3.13.0"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.6.1",
     "@commitlint/config-conventional": "^19.6.0",
+    "@swc/core": "^1.15.21",
+    "@swc/jest": "^0.2.39",
     "@types/express": "^5.0.0",
+    "@types/jest": "^30.0.0",
     "@types/node": "^22.10.7",
+    "@types/node-cron": "^3.0.11",
+    "@types/supertest": "^7.2.0",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
     "husky": "^9.1.7",
+    "jest": "^30.3.0",
     "lint-staged": "^15.4.2",
     "prettier": "^3.4.2",
+    "supertest": "^7.2.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.21.0"
   },
+  "engines": {
+    "node": ">=20.18.0"
+  },
   "lint-staged": {
-    "*.{ts}": ["eslint --fix", "prettier --write"],
-    "*.{json,md}": ["prettier --write"]
+    "*.ts": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md}": [
+      "prettier --write"
+    ]
   }
 }

@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Workspace {
+  id            Int           @id @default(autoincrement())
+  name          String        @unique
+  githubOrg     String
+  nicknameRegex String
+  cohortRules   String        // JSON: [{"year": 2026, "cohort": 8}, ...]
+  members       Member[]
+  missionRepos  MissionRepo[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model Member {
+  id          Int          @id @default(autoincrement())
+  githubId    String
+  nickname    String?
+  manualNickname String?
+  nicknameStats String?    // JSON: [{"nickname":"...", "count":2, "lastSeenAt":"..."}]
+  cohort      Int?
+  blog        String?
+  workspaceId Int
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id])
+  submissions Submission[]
+  blogPosts   BlogPost[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([githubId, workspaceId])
+}
+
+model MissionRepo {
+  id            Int          @id @default(autoincrement())
+  githubRepoId  Int?         @unique
+  name          String
+  repoUrl       String
+  description   String?
+  track         String?      // frontend | backend | android | null(공통 미션)
+  type          String       @default("individual") // individual | integration
+  status        String       @default("active") // active | candidate | excluded
+  candidateReason String?
+  nicknameRegex String?      // null이면 Workspace.nicknameRegex fallback
+  cohortRegexRules String?   // JSON: [{"cohort": 7, "nicknameRegex": "..."}, ...]
+  workspaceId   Int
+  workspace     Workspace    @relation(fields: [workspaceId], references: [id])
+  submissions   Submission[]
+
+  @@unique([name, workspaceId])
+}
+
+model Submission {
+  id            Int         @id @default(autoincrement())
+  prNumber      Int
+  prUrl         String
+  title         String
+  submittedAt   DateTime
+  memberId      Int
+  missionRepoId Int
+  member        Member      @relation(fields: [memberId], references: [id])
+  missionRepo   MissionRepo @relation(fields: [missionRepoId], references: [id])
+
+  @@unique([prNumber, missionRepoId])
+}
+
+model BlogPost {
+  id          Int      @id @default(autoincrement())
+  url         String   @unique
+  title       String
+  publishedAt DateTime
+  memberId    Int
+  member      Member   @relation(fields: [memberId], references: [id])
+  createdAt   DateTime @default(now())
+}
