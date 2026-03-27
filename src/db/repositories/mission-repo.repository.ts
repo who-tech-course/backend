@@ -22,6 +22,12 @@ export function createMissionRepoRepository(db: PrismaClient) {
         db.submission.deleteMany({ where: { missionRepoId: id } }),
         db.missionRepo.delete({ where: { id } }),
       ]),
+
+    deleteAllWithSubmissions: (workspaceId: number) =>
+      db.$transaction([
+        db.submission.deleteMany({ where: { missionRepo: { workspaceId } } }),
+        db.missionRepo.deleteMany({ where: { workspaceId } }),
+      ]),
   };
 }
 

@@ -22,7 +22,18 @@ export type DiscoveredMissionRepo = {
 const INCLUDE_PREFIXES = ['javascript-', 'react-', 'java-', 'spring-', 'android-', 'kotlin-', 'jwp-', 'ts-'];
 
 const INCLUDE_KEYWORDS = ['basecamp', 'airline', 'roomescape', 'shopping', 'learning', 'mission', 'rendering'];
-const EXCLUDE_KEYWORDS = ['docs', 'doc', 'roadmap', 'service', 'apply', 'profile', 'prolog', 'tecoble', 'wiki'];
+const EXCLUDE_KEYWORDS = [
+  'docs',
+  'doc',
+  'roadmap',
+  'service',
+  'apply',
+  'profile',
+  'prolog',
+  'tecoble',
+  'wiki',
+  'precourse',
+];
 
 export async function fetchOrgRepos(octokit: Octokit, org: string, perPage = 100): Promise<OrgRepo[]> {
   const allRepos: OrgRepo[] = [];

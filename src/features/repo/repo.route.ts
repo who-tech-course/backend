@@ -36,6 +36,13 @@ export function createRepoRouter(service: RepoService) {
   );
 
   router.get(
+    '/:id/validate-regex',
+    asyncHandler(async (req, res) => {
+      res.json(await service.validateRepoRegex(parseId(req.params['id'])));
+    }),
+  );
+
+  router.get(
     '/:id/detect-regex',
     asyncHandler(async (req, res) => {
       res.json(await service.detectRepoRegex(parseId(req.params['id'])));
@@ -46,6 +53,14 @@ export function createRepoRouter(service: RepoService) {
     '/:id/sync',
     asyncHandler(async (req, res) => {
       res.json(await service.syncRepoById(parseId(req.params['id'])));
+    }),
+  );
+
+  router.delete(
+    '/',
+    asyncHandler(async (_req, res) => {
+      await service.deleteAllRepos();
+      res.status(204).end();
     }),
   );
 

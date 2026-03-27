@@ -8,26 +8,28 @@ datasource db {
 }
 
 model Workspace {
-  id            Int           @id @default(autoincrement())
-  name          String        @unique
-  githubOrg     String
-  nicknameRegex String
-  cohortRules   String        // JSON: [{"year": 2026, "cohort": 8}, ...]
-  members       Member[]
-  missionRepos  MissionRepo[]
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id              Int           @id @default(autoincrement())
+  name            String        @unique
+  githubOrg       String
+  nicknameRegex   String
+  cohortRules     String        // JSON: [{"year": 2026, "cohort": 8}, ...]
+  blogSyncEnabled Boolean       @default(true)
+  members         Member[]
+  missionRepos    MissionRepo[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 }
 
 model Member {
-  id          Int          @id @default(autoincrement())
-  githubId    String
-  nickname    String?
+  id             Int          @id @default(autoincrement())
+  githubId       String
+  nickname       String?
   manualNickname String?
-  nicknameStats String?    // JSON: [{"nickname":"...", "count":2, "lastSeenAt":"..."}]
-  cohort      Int?
-  blog        String?
-  workspaceId Int
+  nicknameStats  String?      // JSON: [{"nickname":"...", "count":2, "lastSeenAt":"..."}]
+  cohort         Int?
+  blog           String?
+  roles          String       @default("[\"crew\"]") // JSON: ["crew"] | ["coach"] | ["crew","reviewer"] 등
+  workspaceId    Int
   workspace   Workspace    @relation(fields: [workspaceId], references: [id])
   submissions      Submission[]
   blogPosts        BlogPost[]
@@ -50,6 +52,9 @@ model MissionRepo {
   candidateReason String?
   nicknameRegex String?      // null이면 Workspace.nicknameRegex fallback
   cohortRegexRules String?   // JSON: [{"cohort": 7, "nicknameRegex": "..."}, ...]
+  cohorts       String?      // JSON: [7, 8] — 이 레포가 해당하는 기수 목록
+  level         Int?         // 1 | 2 | 3 | 4 — 레벨 (null이면 미분류)
+  order         Int          @default(0)   // 레벨 내 정렬 순서
   syncMode      String       @default("continuous") // continuous | once
   lastSyncAt    DateTime?
   workspaceId   Int

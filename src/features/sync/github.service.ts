@@ -25,9 +25,9 @@ export async function fetchRepoPRs(
   octokit: Octokit,
   org: string,
   repo: string,
-  options: { perPage?: number; since?: Date } = {},
+  options: { perPage?: number; since?: Date; maxPages?: number } = {},
 ): Promise<Awaited<ReturnType<typeof octokit.pulls.list>>['data']> {
-  const { perPage = 100, since } = options;
+  const { perPage = 100, since, maxPages } = options;
   const allPRs = [];
   let page = 1;
 
@@ -54,6 +54,7 @@ export async function fetchRepoPRs(
     }
 
     if (data.length < perPage) break;
+    if (maxPages && page >= maxPages) break;
     page++;
   }
 

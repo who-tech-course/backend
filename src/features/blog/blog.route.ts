@@ -18,7 +18,9 @@ export function createBlogRouter(service: BlogAdminService) {
       const limitValue = req.query['limit'];
       const limit = typeof limitValue === 'string' ? Number(limitValue) : 30;
       if (Number.isNaN(limit) || limit < 1 || limit > 50) badRequest('invalid limit');
-      res.json(await service.backfillWorkspaceBlogLinks(limit));
+      const cohortValue = req.query['cohort'];
+      const cohort = typeof cohortValue === 'string' ? Number(cohortValue) : undefined;
+      res.json(await service.backfillWorkspaceBlogLinks(limit, cohort && !Number.isNaN(cohort) ? cohort : undefined));
     }),
   );
 

@@ -7,26 +7,30 @@ export function createWorkspaceService(deps: { workspaceRepo: WorkspaceRepositor
   return {
     getOrThrow: () => workspaceRepo.findOrThrow(),
 
-    getSettings: async (): Promise<{ nicknameRegex: string; cohortRules: CohortRule[] }> => {
+    getSettings: async (): Promise<{ nicknameRegex: string; cohortRules: CohortRule[]; blogSyncEnabled: boolean }> => {
       const workspace = await workspaceRepo.findOrThrow();
       return {
         nicknameRegex: workspace.nicknameRegex,
         cohortRules: JSON.parse(workspace.cohortRules) as CohortRule[],
+        blogSyncEnabled: workspace.blogSyncEnabled,
       };
     },
 
     updateSettings: async (input: {
       nicknameRegex?: string;
       cohortRules?: CohortRule[];
-    }): Promise<{ nicknameRegex: string; cohortRules: CohortRule[] }> => {
+      blogSyncEnabled?: boolean;
+    }): Promise<{ nicknameRegex: string; cohortRules: CohortRule[]; blogSyncEnabled: boolean }> => {
       const workspace = await workspaceRepo.findOrThrow();
       const updated = await workspaceRepo.update(workspace.id, {
         ...(input.nicknameRegex !== undefined ? { nicknameRegex: input.nicknameRegex } : {}),
         ...(input.cohortRules !== undefined ? { cohortRules: JSON.stringify(input.cohortRules) } : {}),
+        ...(input.blogSyncEnabled !== undefined ? { blogSyncEnabled: input.blogSyncEnabled } : {}),
       });
       return {
         nicknameRegex: updated.nicknameRegex,
         cohortRules: JSON.parse(updated.cohortRules) as CohortRule[],
+        blogSyncEnabled: updated.blogSyncEnabled,
       };
     },
 

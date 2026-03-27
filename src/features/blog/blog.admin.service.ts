@@ -15,13 +15,16 @@ export function createBlogAdminService(deps: {
   return {
     syncWorkspaceBlogs: async () => {
       const workspace = await workspaceService.getOrThrow();
+      if (!workspace.blogSyncEnabled) {
+        return { synced: 0, deleted: 0, skipped: true };
+      }
       return blogService.syncBlogs(workspace.id);
     },
 
-    backfillWorkspaceBlogLinks: async (limit = 30) => {
+    backfillWorkspaceBlogLinks: async (limit = 30, cohort?: number) => {
       const workspace = await workspaceService.getOrThrow();
       const members = await memberRepo.findMany({
-        where: { workspaceId: workspace.id, blog: null },
+        where: { workspaceId: workspace.id, blog: null, ...(cohort != null ? { cohort } : {}) },
         orderBy: [{ submissions: { _count: 'desc' } }, { id: 'asc' }],
         take: limit,
         select: { id: true, githubId: true, nickname: true },

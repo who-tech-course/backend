@@ -5,6 +5,20 @@ export function createBlogPostRepository(db: PrismaClient) {
     upsert: (args: Prisma.BlogPostUpsertArgs) => db.blogPost.upsert(args),
     deleteBefore: (date: Date) => db.blogPost.deleteMany({ where: { publishedAt: { lt: date } } }),
 
+    findByMember: (memberId: number) =>
+      Promise.all([
+        db.blogPost.findMany({
+          where: { memberId },
+          orderBy: { publishedAt: 'desc' },
+          select: { url: true, title: true, publishedAt: true },
+        }),
+        db.blogPostLatest.findMany({
+          where: { memberId },
+          orderBy: { publishedAt: 'desc' },
+          select: { url: true, title: true, publishedAt: true },
+        }),
+      ]).then(([archive, latest]) => ({ archive, latest })),
+
     refreshLatest: async (since: Date) => {
       const recent = await db.blogPost.findMany({ where: { publishedAt: { gte: since } } });
       await db.blogPostLatest.deleteMany({});

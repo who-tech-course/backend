@@ -6,6 +6,14 @@ let memberSearchTimer = null;
 let repoTab = 'base';
 let regexModalRepoId = null;
 let regexModalResult = null;
+let regexModalMode = 'detect'; // 'detect' | 'edit'
+let repoPageContinuous = 1;
+let repoPageOnce = 1;
+const REPO_PAGE_SIZE = 20;
+
+function roleLabel(role) {
+  return role === 'coach' ? '코치' : role === 'reviewer' ? '리뷰어' : '크루';
+}
 
 function login() {
   token = document.getElementById('secret-input').value;
@@ -48,7 +56,52 @@ function loadWorkspace() {
     .then((data) => {
       document.getElementById('nickname-regex').value = data.nicknameRegex;
       document.getElementById('cohort-rules').value = JSON.stringify(data.cohortRules, null, 2);
+      updateBlogSyncToggle(data.blogSyncEnabled);
     });
+}
+
+let blogSyncCountdownTimer = null;
+
+function updateBlogSyncToggle(enabled) {
+  const btn = document.getElementById('blog-sync-toggle');
+  if (!btn) return;
+  btn.classList.toggle('active', enabled);
+
+  clearInterval(blogSyncCountdownTimer);
+  blogSyncCountdownTimer = null;
+
+  if (enabled) {
+    const updateCountdown = () => {
+      const now = new Date();
+      const nextHour = new Date(now);
+      nextHour.setHours(now.getHours() + 1, 0, 0, 0);
+      const diffMs = nextHour - now;
+      const diffMin = Math.floor(diffMs / 60000);
+      const diffSec = Math.floor((diffMs % 60000) / 1000);
+      btn.textContent = `블로그 자동수집 ON · ${diffMin}분 ${diffSec}초 후`;
+    };
+    updateCountdown();
+    blogSyncCountdownTimer = setInterval(updateCountdown, 1000);
+  } else {
+    btn.textContent = '블로그 자동수집 OFF';
+  }
+}
+
+function toggleBlogSync() {
+  fetch('/admin/workspace', { headers: authHeaders() })
+    .then((res) => res.json())
+    .then((data) => {
+      const next = !data.blogSyncEnabled;
+      return fetch('/admin/workspace', {
+        method: 'PUT',
+        headers: authHeaders('application/json'),
+        body: JSON.stringify({ blogSyncEnabled: next }),
+      }).then(() => {
+        updateBlogSyncToggle(next);
+        toast(`블로그 자동수집 ${next ? 'ON' : 'OFF'}`);
+      });
+    })
+    .catch(() => toast('설정 변경 실패'));
 }
 
 function loadRepos() {
@@ -62,6 +115,8 @@ function loadRepos() {
 
 function setRepoTab(tab) {
   repoTab = tab;
+  repoPageContinuous = 1;
+  repoPageOnce = 1;
   document.getElementById('tab-base').classList.toggle('active', tab === 'base');
   document.getElementById('tab-common').classList.toggle('active', tab === 'common');
   const trackFilter = document.getElementById('repo-track-filter');
@@ -71,6 +126,10 @@ function setRepoTab(tab) {
 
 function repoRow(repo) {
   const syncedAt = repo.lastSyncAt ? new Date(repo.lastSyncAt).toLocaleString('ko-KR') : '없음';
+  const hasCustomRegex = !!(repo.nicknameRegex || repo.cohortRegexRules?.length);
+  const cohortsHtml = repo.cohorts?.length
+    ? repo.cohorts.map((c) => `<span class="pill cohort">${c}기</span>`).join(' ')
+    : '<span class="muted">-</span>';
   return `
     <tr>
       <td>
@@ -83,19 +142,23 @@ function repoRow(repo) {
       <td>
         <div class="stack">
           <span>${repo.track == null ? '공통' : repo.track}</span>
-          <span class="muted">${repo.type}</span>
+          <span class="muted">${repo.type}${repo.level != null ? ` · 레벨${repo.level}` : ''}</span>
         </div>
       </td>
+      <td>${cohortsHtml}</td>
       <td>
         <div class="stack">
           <span>${escapeHtml(repo.description ?? '-')}</span>
           <span class="muted">${escapeHtml(repo.candidateReason ?? '-')}</span>
         </div>
       </td>
-      <td class="mono">${escapeHtml(formatRepoRegex(repo))}</td>
+      <td style="cursor:pointer" onclick="editRepoRegex(${repo.id})" title="클릭해서 정규식 수정">
+        ${hasCustomRegex ? '<span class="pill active" style="font-size:11px">있음</span>' : '<span class="pill" style="font-size:11px;background:#f1f5f9;color:#64748b">기본값</span>'}
+      </td>
       <td class="muted small">${syncedAt}</td>
       <td>
         <div class="actions">
+          <input type="number" class="order-input" value="${repo.order ?? 0}" onchange="setRepoOrder(${repo.id}, this.value)" title="순서" />
           <button class="btn-sm btn-secondary" onclick="syncRepo(${repo.id}, this)">Sync</button>
           <button class="btn-sm btn-ghost" onclick="detectRepoRegex(${repo.id})">감지</button>
           <button class="btn-sm btn-ghost" onclick="editRepo(${repo.id})">수정</button>
@@ -104,6 +167,11 @@ function repoRow(repo) {
       </td>
     </tr>
   `;
+}
+
+function resetRepoPages() {
+  repoPageContinuous = 1;
+  repoPageOnce = 1;
 }
 
 function renderRepos() {
@@ -124,16 +192,52 @@ function renderRepos() {
   const continuous = filtered.filter((r) => r.syncMode !== 'once');
   const once = filtered.filter((r) => r.syncMode === 'once');
 
-  const tbodyContinuous = document.getElementById('repo-table-body-continuous');
-  const tbodyOnce = document.getElementById('repo-table-body-once');
+  renderPagedRepos('repo-table-body-continuous', 'repo-pagination-continuous', continuous, repoPageContinuous, (p) => {
+    repoPageContinuous = p;
+    renderRepos();
+  });
+  renderPagedRepos('repo-table-body-once', 'repo-pagination-once', once, repoPageOnce, (p) => {
+    repoPageOnce = p;
+    renderRepos();
+  });
+}
 
-  tbodyContinuous.innerHTML = continuous.length
-    ? continuous.map(repoRow).join('')
-    : `<tr><td colspan="7" class="muted">없음</td></tr>`;
+function renderPagedRepos(tbodyId, paginationId, repos, page, onPageChange) {
+  const tbody = document.getElementById(tbodyId);
+  const paginationEl = document.getElementById(paginationId);
+  const totalPages = Math.max(1, Math.ceil(repos.length / REPO_PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paged = repos.slice((safePage - 1) * REPO_PAGE_SIZE, safePage * REPO_PAGE_SIZE);
 
-  tbodyOnce.innerHTML = once.length
-    ? once.map(repoRow).join('')
-    : `<tr><td colspan="7" class="muted">없음</td></tr>`;
+  tbody.innerHTML = paged.length
+    ? paged.map(repoRow).join('')
+    : `<tr><td colspan="8" class="muted">없음</td></tr>`;
+
+  if (totalPages <= 1) {
+    paginationEl.innerHTML = '';
+    return;
+  }
+
+  paginationEl.innerHTML = `
+    <div class="pagination">
+      <button class="btn-sm btn-ghost" ${safePage <= 1 ? 'disabled' : ''} onclick="(${onPageChange.toString()})(${safePage - 1})">이전</button>
+      <span class="sub">${safePage} / ${totalPages} (${repos.length}개)</span>
+      <button class="btn-sm btn-ghost" ${safePage >= totalPages ? 'disabled' : ''} onclick="(${onPageChange.toString()})(${safePage + 1})">다음</button>
+    </div>
+  `;
+}
+
+function activateRepo(id, syncMode) {
+  fetch(`/admin/repos/${id}`, {
+    method: 'PATCH',
+    headers: authHeaders('application/json'),
+    body: JSON.stringify({ status: 'active', syncMode }),
+  })
+    .then(() => {
+      toast(`레포 활성화 완료 (${syncMode === 'once' ? '한 번만' : '계속'})`);
+      return loadRepos();
+    })
+    .catch(() => alert('활성화에 실패했습니다.'));
 }
 
 function discoverRepos() {
@@ -193,6 +297,36 @@ function addRepo() {
     .catch(() => alert('레포 추가에 실패했습니다.'));
 }
 
+function editRepoRegex(id) {
+  const repo = repoList.find((item) => item.id === id);
+  if (!repo) return;
+
+  regexModalRepoId = id;
+  regexModalResult = null;
+  regexModalMode = 'edit';
+
+  const modal = document.getElementById('regex-modal');
+  const body = document.getElementById('regex-modal-body');
+  const applyBtn = document.getElementById('regex-apply-btn');
+  const title = document.getElementById('regex-modal-title');
+
+  title.textContent = `정규식 수정 — ${repo.name}`;
+  applyBtn.disabled = false;
+
+  const cohortVal = repo.cohortRegexRules?.length ? JSON.stringify(repo.cohortRegexRules, null, 2) : '';
+  body.innerHTML = `
+    <div style="margin-bottom:16px;">
+      <label style="display:block;margin-bottom:4px;font-size:13px;">기본 닉네임 정규식</label>
+      <input type="text" id="edit-regex-nickname" value="${escapeHtml(repo.nicknameRegex ?? '')}" placeholder="없으면 workspace 기본값 사용" style="width:100%" />
+    </div>
+    <div>
+      <label style="display:block;margin-bottom:4px;font-size:13px;">기수별 정규식 JSON</label>
+      <textarea id="edit-regex-cohort" rows="5" placeholder='[{"cohort":7,"nicknameRegex":"..."}]' style="width:100%;font-family:monospace">${escapeHtml(cohortVal)}</textarea>
+    </div>
+  `;
+  modal.style.display = 'flex';
+}
+
 function editRepo(id) {
   const repo = repoList.find((item) => item.id === id);
   if (!repo) return;
@@ -205,6 +339,12 @@ function editRepo(id) {
   if (type === null) return;
   const description = prompt('설명', repo.description ?? '');
   if (description === null) return;
+  const cohortsInput = prompt('기수 (쉼표로 구분, 예: 7,8)', repo.cohorts?.join(', ') ?? '');
+  if (cohortsInput === null) return;
+  const cohorts = cohortsInput ? cohortsInput.split(',').map((c) => Number(c.trim())).filter((n) => !isNaN(n)) : null;
+  const levelInput = prompt('레벨 (1/2/3/4, 없으면 빈칸)', repo.level != null ? String(repo.level) : '');
+  if (levelInput === null) return;
+  const level = levelInput.trim() ? Number(levelInput.trim()) : null;
   const nicknameRegex = prompt('기본 닉네임 정규식', repo.nicknameRegex ?? '');
   if (nicknameRegex === null) return;
   const cohortRegexRules = prompt(
@@ -221,6 +361,8 @@ function editRepo(id) {
       track,
       type,
       description: description || null,
+      cohorts,
+      level,
       nicknameRegex: nicknameRegex || null,
       cohortRegexRules: parseJsonOrNull(cohortRegexRules),
     }),
@@ -232,6 +374,17 @@ function editRepo(id) {
     .catch(() => alert('레포 수정에 실패했습니다.'));
 }
 
+function deleteAllRepos() {
+  if (!confirm('모든 레포와 관련 submission을 삭제합니다. 계속할까요?')) return;
+
+  fetch('/admin/repos', { method: 'DELETE', headers: authHeaders() })
+    .then(() => {
+      toast('전체 레포 삭제 완료');
+      return Promise.all([loadRepos(), loadStatus()]);
+    })
+    .catch(() => alert('전체 삭제에 실패했습니다.'));
+}
+
 function deleteRepo(id) {
   if (!confirm('레포와 관련 submission을 함께 삭제합니다. 계속할까요?')) return;
 
@@ -241,6 +394,18 @@ function deleteRepo(id) {
       return Promise.all([loadRepos(), loadStatus()]);
     })
     .catch(() => alert('레포 삭제에 실패했습니다.'));
+}
+
+function setRepoOrder(id, value) {
+  const order = Number(value);
+  if (isNaN(order)) return;
+  fetch(`/admin/repos/${id}`, {
+    method: 'PATCH',
+    headers: authHeaders('application/json'),
+    body: JSON.stringify({ order }),
+  })
+    .then(() => loadRepos())
+    .catch(() => alert('순서 변경에 실패했습니다.'));
 }
 
 function syncRepo(id, button) {
@@ -262,23 +427,59 @@ function syncRepo(id, button) {
 
 function triggerSync() {
   const button = document.getElementById('sync-btn');
+  const progressWrap = document.getElementById('sync-progress-wrap');
+  const progressBar = document.getElementById('sync-progress-bar');
+  const progressLabel = document.getElementById('sync-progress-label');
+
   button.disabled = true;
   button.textContent = '동기화 중...';
-  fetch('/admin/sync', { method: 'POST', headers: authHeaders() })
-    .then((response) => response.json())
-    .then((data) => {
-      document.getElementById('sync-result').textContent =
-        `완료: ${data.reposSynced}개 레포, ${data.totalSynced}건 수집됨`;
-      toast(`전체 sync 완료 (${data.totalSynced}건)`);
-      return Promise.all([loadStatus(), loadMembers()]);
-    })
-    .catch(() => {
-      document.getElementById('sync-result').textContent = '전체 sync 실패';
-    })
-    .finally(() => {
-      button.disabled = false;
-      button.textContent = '전체 Sync';
-    });
+  progressWrap.style.display = 'block';
+  progressBar.style.width = '0%';
+  progressLabel.textContent = '준비 중...';
+
+  const cohortVal = document.getElementById('sync-cohort').value.trim();
+  const cohortParam = cohortVal ? `&cohort=${encodeURIComponent(cohortVal)}` : '';
+  const url = `/admin/sync/stream?token=${encodeURIComponent(token)}${cohortParam}`;
+  const es = new EventSource(url);
+
+  es.addEventListener('progress', (e) => {
+    const { repo, done, total, synced } = JSON.parse(e.data);
+    const pct = Math.round((done / total) * 100);
+    progressBar.style.width = `${pct}%`;
+    progressLabel.textContent = `(${done}/${total}) ${repo} — ${synced}건`;
+    document.getElementById('sync-result').textContent = `진행 중: ${done}/${total} 레포`;
+  });
+
+  es.addEventListener('done', (e) => {
+    const { reposSynced, totalSynced } = JSON.parse(e.data);
+    progressBar.style.width = '100%';
+    progressLabel.textContent = `완료: ${reposSynced}개 레포, ${totalSynced}건 수집됨`;
+    document.getElementById('sync-result').textContent = `완료: ${reposSynced}개 레포, ${totalSynced}건 수집됨`;
+    toast(`전체 sync 완료 (${totalSynced}건)`);
+    es.close();
+    button.disabled = false;
+    button.textContent = '전체 Sync';
+    Promise.all([loadStatus(), loadMembers(), loadRepos()]);
+  });
+
+  es.addEventListener('error', (e) => {
+    const msg = e.data ? JSON.parse(e.data).message : 'sync 실패';
+    progressLabel.textContent = `오류: ${msg}`;
+    document.getElementById('sync-result').textContent = '전체 sync 실패';
+    toast('전체 sync 실패');
+    es.close();
+    button.disabled = false;
+    button.textContent = '전체 Sync';
+  });
+
+  es.onerror = () => {
+    if (es.readyState === EventSource.CLOSED) return;
+    progressLabel.textContent = '연결 오류';
+    document.getElementById('sync-result').textContent = '전체 sync 실패';
+    es.close();
+    button.disabled = false;
+    button.textContent = '전체 Sync';
+  };
 }
 
 function triggerTsAndLearningTest() {
@@ -326,7 +527,9 @@ function triggerBlogBackfill() {
   const button = document.getElementById('blog-backfill-btn');
   button.disabled = true;
   button.textContent = '조회 중...';
-  fetch('/admin/blog/backfill?limit=30', { method: 'POST', headers: authHeaders() })
+  const cohortVal = document.getElementById('sync-cohort').value.trim();
+  const cohortParam = cohortVal ? `&cohort=${encodeURIComponent(cohortVal)}` : '';
+  fetch(`/admin/blog/backfill?limit=30${cohortParam}`, { method: 'POST', headers: authHeaders() })
     .then((response) => response.json())
     .then((data) => {
       const failureText = data.failures.length > 0
@@ -347,11 +550,15 @@ function triggerBlogBackfill() {
 function loadMembers() {
   const q = document.getElementById('member-search').value.trim();
   const cohort = document.getElementById('member-cohort-filter').value;
+  const role = document.getElementById('member-role-filter').value;
+  const track = document.getElementById('member-track-filter').value;
   const hasBlog = document.getElementById('member-blog-filter').value;
   const params = new URLSearchParams();
 
   if (q) params.set('q', q);
   if (cohort) params.set('cohort', cohort);
+  if (role) params.set('role', role);
+  if (track) params.set('track', track);
   if (hasBlog) params.set('hasBlog', hasBlog);
 
   return fetch(`/admin/members?${params.toString()}`, { headers: authHeaders() })
@@ -372,7 +579,7 @@ function renderMembers() {
   const summary = document.getElementById('member-summary');
 
   if (memberList.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8" class="muted">조건에 맞는 멤버가 없습니다.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="muted">조건에 맞는 멤버가 없습니다.</td></tr>`;
     summary.textContent = '총 0명';
     return;
   }
@@ -391,6 +598,7 @@ function renderMembers() {
           <span class="muted">manual: ${escapeHtml(member.manualNickname ?? '-')}</span>
         </div>
       </td>
+      <td>${(member.roles?.length ? member.roles : ['crew']).map((r) => `<span class="pill ${r}">${roleLabel(r)}</span>`).join(' ')}</td>
       <td>${member.cohort ? `<span class="pill cohort">${member.cohort}기</span>` : '-'}</td>
       <td>
         ${member.tracks.length > 0 ? `
@@ -414,7 +622,12 @@ function renderMembers() {
           ` : '<div class="muted" style="margin-top:8px">제출 내역이 없습니다.</div>'}
         </details>
       </td>
-      <td>${member.blog ? `<a class="link" href="${member.blog}" target="_blank">${member.blog}</a>` : '-'}</td>
+      <td>
+        ${member.blog
+          ? `<a class="link" href="${member.blog}" target="_blank" onclick="event.stopPropagation()">${member.blog}</a>
+             ${member.blogPostsLatest?.length > 0 ? `<button class="btn-sm btn-ghost" style="margin-top:4px" onclick="openBlogModal(${member.id}, '${escapeHtml(member.nickname ?? member.githubId)}')">글 보기</button>` : ''}`
+          : '-'}
+      </td>
       <td>
         ${member.blogPostsLatest.length > 0 ? `
           <div class="post-list">
@@ -429,6 +642,7 @@ function renderMembers() {
       </td>
       <td>
         <div class="actions">
+          <button class="btn-sm btn-ghost" onclick="editMemberRoles(${member.id})">역할</button>
           <button class="btn-sm btn-ghost" onclick="editMember(${member.id})">수정</button>
           <button class="btn-sm btn-danger" onclick="deleteMember(${member.id})">삭제</button>
         </div>
@@ -436,7 +650,54 @@ function renderMembers() {
     </tr>
   `).join('');
 
-  summary.textContent = `총 ${memberList.length}명`;
+  const cohortCounts = {};
+  for (const m of memberList) {
+    const key = m.cohort ? `${m.cohort}기` : '기수 미상';
+    cohortCounts[key] = (cohortCounts[key] ?? 0) + 1;
+  }
+  const cohortSummary = Object.entries(cohortCounts)
+    .sort((a, b) => {
+      const an = parseInt(a[0]);
+      const bn = parseInt(b[0]);
+      if (isNaN(an)) return 1;
+      if (isNaN(bn)) return -1;
+      return bn - an;
+    })
+    .map(([k, v]) => `${k} ${v}명`)
+    .join(' · ');
+  summary.textContent = `총 ${memberList.length}명` + (cohortSummary ? `  |  ${cohortSummary}` : '');
+}
+
+function addMember() {
+  const githubId = document.getElementById('new-member-github').value.trim();
+  if (!githubId) {
+    alert('GitHub ID를 입력하세요.');
+    return;
+  }
+
+  const nickname = document.getElementById('new-member-nickname').value.trim() || null;
+  const cohortVal = document.getElementById('new-member-cohort').value.trim();
+  const cohort = cohortVal ? Number(cohortVal) : null;
+  const roles = ['crew', 'coach', 'reviewer'].filter(
+    (r) => document.getElementById(`new-member-role-${r}`).checked,
+  );
+  if (roles.length === 0) roles.push('crew');
+  const blog = document.getElementById('new-member-blog').value.trim() || null;
+
+  fetch('/admin/members', {
+    method: 'POST',
+    headers: authHeaders('application/json'),
+    body: JSON.stringify({ githubId, nickname, cohort, roles, blog }),
+  })
+    .then((res) => {
+      if (!res.ok) throw new Error('failed');
+      ['new-member-github', 'new-member-nickname', 'new-member-cohort', 'new-member-blog'].forEach(
+        (id) => { document.getElementById(id).value = ''; },
+      );
+      toast('멤버 추가 완료');
+      return Promise.all([loadMembers(), loadStatus()]);
+    })
+    .catch(() => alert('멤버 추가에 실패했습니다.'));
 }
 
 function editMember(id) {
@@ -458,13 +719,88 @@ function editMember(id) {
     }),
   })
     .then((response) => {
-      if (!response.ok) {
-        throw new Error('failed');
-      }
+      if (!response.ok) throw new Error('failed');
       toast('멤버 수정 완료');
       return loadMembers();
     })
     .catch(() => alert('멤버 수정에 실패했습니다.'));
+}
+
+function editMemberRoles(id) {
+  const member = memberList.find((item) => item.id === id);
+  if (!member) return;
+
+  const current = (member.roles ?? ['crew']).join(', ');
+  const rolesInput = prompt('역할 (crew / coach / reviewer, 쉼표로 구분)', current);
+  if (rolesInput === null) return;
+  const roles = rolesInput.split(',').map((r) => r.trim()).filter(Boolean);
+
+  fetch(`/admin/members/${id}`, {
+    method: 'PATCH',
+    headers: authHeaders('application/json'),
+    body: JSON.stringify({ roles: roles.length ? roles : ['crew'] }),
+  })
+    .then((response) => {
+      if (!response.ok) throw new Error('failed');
+      toast('역할 수정 완료');
+      return loadMembers();
+    })
+    .catch(() => alert('역할 수정에 실패했습니다.'));
+}
+
+function openBlogModal(memberId, name) {
+  const modal = document.getElementById('blog-modal');
+  const title = document.getElementById('blog-modal-title');
+  const body = document.getElementById('blog-modal-body');
+
+  title.textContent = `${name} 블로그 글`;
+  body.innerHTML = '<div class="sub" style="padding:16px">불러오는 중...</div>';
+  modal.style.display = 'flex';
+
+  fetch(`/admin/members/${memberId}/blog-posts`, { headers: authHeaders() })
+    .then((res) => res.json())
+    .then(({ archive, latest }) => {
+      const renderList = (posts) =>
+        posts.length === 0
+          ? '<div class="muted" style="padding:8px 0">없음</div>'
+          : posts.map((p) => `
+            <div class="post-item" style="padding:8px 0;border-bottom:1px solid #f1f5f9">
+              <a class="link" href="${p.url}" target="_blank">${escapeHtml(p.title)}</a>
+              <div class="muted">${new Date(p.publishedAt).toLocaleDateString('ko-KR')}</div>
+            </div>
+          `).join('');
+
+      body.innerHTML = `
+        <div style="padding:16px">
+          <div style="margin-bottom:20px">
+            <div style="font-weight:600;margin-bottom:8px">최신 스냅샷 (7일) — ${latest.length}건</div>
+            ${renderList(latest)}
+          </div>
+          <div>
+            <div style="font-weight:600;margin-bottom:8px">전체 아카이브 (30일) — ${archive.length}건</div>
+            ${renderList(archive)}
+          </div>
+        </div>
+      `;
+    })
+    .catch(() => {
+      body.innerHTML = '<div class="sub" style="padding:16px">불러오기 실패</div>';
+    });
+}
+
+function closeBlogModal() {
+  document.getElementById('blog-modal').style.display = 'none';
+}
+
+function deleteAllMembers() {
+  if (!confirm('모든 멤버와 관련 submission, 블로그 글을 삭제합니다. 계속할까요?')) return;
+
+  fetch('/admin/members', { method: 'DELETE', headers: authHeaders() })
+    .then(() => {
+      toast('전체 멤버 삭제 완료');
+      return Promise.all([loadMembers(), loadStatus()]);
+    })
+    .catch(() => alert('전체 삭제에 실패했습니다.'));
 }
 
 function deleteMember(id) {
@@ -535,6 +871,7 @@ function toast(message) {
 function detectRepoRegex(id) {
   regexModalRepoId = id;
   regexModalResult = null;
+  regexModalMode = 'detect';
 
   const modal = document.getElementById('regex-modal');
   const body = document.getElementById('regex-modal-body');
@@ -598,28 +935,130 @@ function closeRegexModal() {
   regexModalResult = null;
 }
 
-function applyDetectedRegex() {
-  if (!regexModalRepoId || !regexModalResult) return;
+function closeValidateModal() {
+  document.getElementById('validate-regex-modal').style.display = 'none';
+}
 
-  const suggestionInput = document.getElementById('suggestion-regex-input');
-  const nicknameRegex = suggestionInput ? suggestionInput.value.trim() || null : null;
+async function startValidateAllRegex() {
+  const modal = document.getElementById('validate-regex-modal');
+  const progress = document.getElementById('validate-regex-progress');
+  const body = document.getElementById('validate-regex-body');
+  const btn = document.getElementById('validate-regex-btn');
 
-  const cohortInputs = document.querySelectorAll('.cohort-regex-input');
-  const cohortRegexRules = [];
-  cohortInputs.forEach((input) => {
-    const cohortAttr = input.getAttribute('data-cohort');
-    if (!cohortAttr) return;
-    const cohort = parseInt(cohortAttr, 10);
-    const regex = input.value.trim();
-    if (!isNaN(cohort) && regex) {
-      cohortRegexRules.push({ cohort, nicknameRegex: regex });
+  modal.style.display = 'flex';
+  body.innerHTML = '';
+  btn.disabled = true;
+
+  const activeRepos = repoList.filter((r) => r.status === 'active');
+  const issues = [];
+
+  for (let i = 0; i < activeRepos.length; i++) {
+    const repo = activeRepos[i];
+    progress.innerHTML = `<span class="sub">검증 중 ${i + 1} / ${activeRepos.length} — ${escapeHtml(repo.name)}</span>`;
+
+    try {
+      const res = await fetch(`/admin/repos/${repo.id}/validate-regex`, { headers: authHeaders() });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const result = await res.json();
+      if (result.unmatched > 0) {
+        issues.push(result);
+      }
+    } catch (e) {
+      issues.push({ id: repo.id, name: repo.name, error: String(e), total: 0, matched: 0, unmatched: 0, samples: [] });
     }
-  });
+  }
 
-  const payload = {
-    nicknameRegex,
-    cohortRegexRules: cohortRegexRules.length > 0 ? cohortRegexRules : null,
-  };
+  progress.innerHTML = `<span class="sub">완료 — ${activeRepos.length}개 검증, 이슈 ${issues.length}개</span>`;
+  btn.disabled = false;
+
+  if (issues.length === 0) {
+    body.innerHTML = '<div class="sub" style="padding:16px 0">이슈 없음 ✓</div>';
+    return;
+  }
+
+  body.innerHTML = issues.map((result) => renderValidateIssue(result)).join('<hr style="margin:8px 0;border-color:#e2e8f0">');
+}
+
+function renderValidateIssue(result) {
+  if (result.error) {
+    return `
+    <div style="padding:12px 0">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <strong>${escapeHtml(result.name)}</strong>
+          <span class="muted" style="margin-left:8px;color:#dc2626">${escapeHtml(result.error)}</span>
+        </div>
+        <button class="btn-sm btn-secondary" onclick="dismissValidateIssue(${result.id})">건너뛰기</button>
+      </div>
+    </div>`;
+  }
+
+  const samplesHtml = result.samples
+    .map(
+      (s) => `
+      <div class="post-item" style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:13px;color:${s.matched ? '#16a34a' : '#dc2626'}">${s.matched ? '✓' : '✗'}</span>
+        <span style="font-size:12px;flex:1">${escapeHtml(s.title)}</span>
+        ${s.extracted ? `<span class="pill crew" style="font-size:11px">${escapeHtml(s.extracted)}</span>` : ''}
+      </div>`,
+    )
+    .join('');
+
+  return `
+    <div style="padding:12px 0">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div>
+          <strong>${escapeHtml(result.name)}</strong>
+          <span class="muted" style="margin-left:8px">${result.matched}/${result.total} 매칭</span>
+        </div>
+        <div class="actions">
+          <button class="btn-sm btn-ghost" onclick="closeValidateModal(); editRepoRegex(${result.id})">정규식 수정</button>
+          <button class="btn-sm btn-ghost" onclick="detectRepoRegex(${result.id}); closeValidateModal()">자동 감지</button>
+          <button class="btn-sm btn-secondary" onclick="dismissValidateIssue(${result.id})">건너뛰기</button>
+        </div>
+      </div>
+      <div id="validate-issue-${result.id}" class="post-list">${samplesHtml}</div>
+    </div>`;
+}
+
+function dismissValidateIssue(id) {
+  const el = document.getElementById(`validate-issue-${id}`);
+  if (el) el.closest('div[style]').style.display = 'none';
+}
+
+function applyDetectedRegex() {
+  if (!regexModalRepoId) return;
+
+  let payload;
+
+  if (regexModalMode === 'edit') {
+    const nicknameRegex = document.getElementById('edit-regex-nickname').value.trim() || null;
+    const cohortRaw = document.getElementById('edit-regex-cohort').value.trim();
+    let cohortRegexRules = null;
+    if (cohortRaw) {
+      try {
+        cohortRegexRules = JSON.parse(cohortRaw);
+      } catch {
+        alert('기수별 정규식 JSON 형식이 올바르지 않습니다.');
+        return;
+      }
+    }
+    payload = { nicknameRegex, cohortRegexRules };
+  } else {
+    if (!regexModalResult) return;
+    const suggestionInput = document.getElementById('suggestion-regex-input');
+    const nicknameRegex = suggestionInput ? suggestionInput.value.trim() || null : null;
+    const cohortInputs = document.querySelectorAll('.cohort-regex-input');
+    const cohortRegexRules = [];
+    cohortInputs.forEach((input) => {
+      const cohortAttr = input.getAttribute('data-cohort');
+      if (!cohortAttr) return;
+      const cohort = parseInt(cohortAttr, 10);
+      const regex = input.value.trim();
+      if (!isNaN(cohort) && regex) cohortRegexRules.push({ cohort, nicknameRegex: regex });
+    });
+    payload = { nicknameRegex, cohortRegexRules: cohortRegexRules.length > 0 ? cohortRegexRules : null };
+  }
 
   fetch(`/admin/repos/${regexModalRepoId}`, {
     method: 'PATCH',
@@ -631,11 +1070,11 @@ function applyDetectedRegex() {
       return response.json();
     })
     .then(() => {
-      toast('정규식 적용 완료');
+      toast('정규식 저장 완료');
       closeRegexModal();
       return loadRepos();
     })
-    .catch(() => alert('정규식 적용에 실패했습니다.'));
+    .catch(() => alert('정규식 저장에 실패했습니다.'));
 }
 
 document.getElementById('secret-input').addEventListener('keydown', (event) => {

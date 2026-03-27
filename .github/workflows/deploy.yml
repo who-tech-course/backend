@@ -28,6 +28,7 @@ jobs:
         run: |
           ssh "$SERVER_USER"@"$SERVER_HOST" '
             cd ~/app/backend &&
+            git checkout -- . &&
             git pull origin develop &&
             npm install --ignore-scripts &&
             npx prisma generate &&

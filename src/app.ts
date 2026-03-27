@@ -43,7 +43,7 @@ const blogPostRepo = createBlogPostRepository(db);
 
 const workspaceService = createWorkspaceService({ workspaceRepo });
 const syncService = createSyncService({ memberRepo, missionRepoRepo, submissionRepo, workspaceRepo });
-const memberService = createMemberService({ memberRepo, workspaceService });
+const memberService = createMemberService({ memberRepo, blogPostRepo, workspaceService });
 const repoService = createRepoService({ missionRepoRepo, workspaceService, syncService, octokit });
 const blogService = createBlogService({ memberRepo, blogPostRepo });
 const blogAdminService = createBlogAdminService({ memberRepo, workspaceService, blogService, octokit });

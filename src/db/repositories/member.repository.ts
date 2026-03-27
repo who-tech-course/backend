@@ -11,13 +11,19 @@ const memberWithRelationsInclude = {
 
 export function createMemberRepository(db: PrismaClient) {
   return {
-    findWithFilters: (workspaceId: number, filters?: { q?: string; cohort?: number; hasBlog?: boolean }) =>
+    findWithFilters: (
+      workspaceId: number,
+      filters?: { q?: string; cohort?: number; hasBlog?: boolean; track?: string; role?: string },
+    ) =>
       db.member.findMany({
         where: {
           workspaceId,
           ...(filters?.cohort ? { cohort: filters.cohort } : {}),
+          // roles is JSON array string — check if it contains the role value
+          ...(filters?.role ? { roles: { contains: `"${filters.role}"` } } : {}),
           ...(filters?.hasBlog === true ? { blog: { not: null } } : {}),
           ...(filters?.hasBlog === false ? { blog: null } : {}),
+          ...(filters?.track ? { submissions: { some: { missionRepo: { track: filters.track } } } } : {}),
           ...(filters?.q
             ? {
                 OR: [
@@ -41,9 +47,12 @@ export function createMemberRepository(db: PrismaClient) {
         select: { id: true, manualNickname: true, nicknameStats: true, blog: true },
       }),
 
+    create: (data: Prisma.MemberUncheckedCreateInput) =>
+      db.member.create({ data, include: memberWithRelationsInclude }),
+
     upsert: (args: Prisma.MemberUpsertArgs) => db.member.upsert(args),
 
-    updateWithRelations: (id: number, data: { manualNickname?: string | null; blog?: string | null }) =>
+    updateWithRelations: (id: number, data: { manualNickname?: string | null; blog?: string | null; roles?: string }) =>
       db.member.update({ where: { id }, data, include: memberWithRelationsInclude }),
 
     patch: (id: number, data: { blog?: string | null }) => db.member.update({ where: { id }, data }),
@@ -53,8 +62,17 @@ export function createMemberRepository(db: PrismaClient) {
     deleteWithRelations: (id: number) =>
       db.$transaction([
         db.blogPost.deleteMany({ where: { memberId: id } }),
+        db.blogPostLatest.deleteMany({ where: { memberId: id } }),
         db.submission.deleteMany({ where: { memberId: id } }),
         db.member.delete({ where: { id } }),
+      ]),
+
+    deleteAllWithRelations: (workspaceId: number) =>
+      db.$transaction([
+        db.blogPost.deleteMany({ where: { member: { workspaceId } } }),
+        db.blogPostLatest.deleteMany({ where: { member: { workspaceId } } }),
+        db.submission.deleteMany({ where: { member: { workspaceId } } }),
+        db.member.deleteMany({ where: { workspaceId } }),
       ]),
   };
 }

@@ -2,7 +2,11 @@ import type { Octokit } from '@octokit/rest';
 import type { MissionRepoRepository } from '../../db/repositories/mission-repo.repository.js';
 import type { WorkspaceService } from '../workspace/workspace.service.js';
 import type { SyncService } from '../sync/sync.service.js';
-import { parseCohortRegexRules, stringifyCohortRegexRules } from '../../shared/cohort-regex.js';
+import {
+  parseCohortRegexRules,
+  stringifyCohortRegexRules,
+  findNicknameRegexByCohort,
+} from '../../shared/cohort-regex.js';
 import type { CohortRegexRule, CohortRule } from '../../shared/types/index.js';
 import { discoverMissionRepos, fetchOrgRepos } from './repo-discovery.service.js';
 import { fetchRepoPRs, detectCohort } from '../sync/github.service.js';
@@ -19,13 +23,24 @@ export function createRepoService(deps: {
   const toResponse = (repo: Awaited<ReturnType<MissionRepoRepository['findByIdOrThrow']>>) => ({
     ...repo,
     cohortRegexRules: parseCohortRegexRules(repo.cohortRegexRules),
+    cohorts: parseCohorts(repo.cohorts),
   });
+
+  function parseCohorts(raw: string | null | undefined): number[] {
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
 
   return {
     listRepos: async (status?: string) => {
       const workspace = await workspaceService.getOrThrow();
       const repos = await missionRepoRepo.findMany({ workspaceId: workspace.id, ...(status ? { status } : {}) }, [
-        { status: 'asc' },
+        { order: 'asc' },
         { name: 'asc' },
       ]);
       return repos.map(toResponse);
@@ -43,6 +58,9 @@ export function createRepoService(deps: {
       candidateReason?: string | null;
       nicknameRegex?: string;
       cohortRegexRules?: CohortRegexRule[];
+      cohorts?: number[];
+      level?: number | null;
+      order?: number;
     }) => {
       const workspace = await workspaceService.getOrThrow();
       const repo = await missionRepoRepo.create({
@@ -57,6 +75,9 @@ export function createRepoService(deps: {
         candidateReason: input.candidateReason ?? null,
         nicknameRegex: input.nicknameRegex ?? null,
         cohortRegexRules: stringifyCohortRegexRules(input.cohortRegexRules),
+        ...(input.cohorts?.length ? { cohorts: JSON.stringify(input.cohorts) } : {}),
+        ...(input.level !== undefined ? { level: input.level } : {}),
+        ...(input.order !== undefined ? { order: input.order } : {}),
         workspaceId: workspace.id,
       });
       return toResponse(repo);
@@ -73,6 +94,9 @@ export function createRepoService(deps: {
         candidateReason?: string | null;
         nicknameRegex?: string | null;
         cohortRegexRules?: CohortRegexRule[] | null;
+        cohorts?: number[] | null;
+        level?: number | null;
+        order?: number;
       },
     ) => {
       const repo = await missionRepoRepo.update(id, {
@@ -86,6 +110,11 @@ export function createRepoService(deps: {
         ...(input.cohortRegexRules !== undefined
           ? { cohortRegexRules: stringifyCohortRegexRules(input.cohortRegexRules) }
           : {}),
+        ...(input.cohorts !== undefined
+          ? { cohorts: input.cohorts === null ? null : JSON.stringify(input.cohorts) }
+          : {}),
+        ...(input.level !== undefined ? { level: input.level } : {}),
+        ...(input.order !== undefined ? { order: input.order } : {}),
       });
       return toResponse(repo);
     },
@@ -136,6 +165,7 @@ export function createRepoService(deps: {
             track: candidate.track,
             type: candidate.type,
             status: 'candidate',
+            syncMode: 'once',
             candidateReason: candidate.candidateReason,
             workspaceId: workspace.id,
           });
@@ -201,7 +231,45 @@ export function createRepoService(deps: {
       return { samples, suggestion };
     },
 
+    validateRepoRegex: async (id: number) => {
+      const workspace = await workspaceService.getOrThrow();
+      const cohortRules = JSON.parse(workspace.cohortRules) as CohortRule[];
+      const workspaceRegex = new RegExp(workspace.nicknameRegex);
+      const repo = await missionRepoRepo.findByIdOrThrow(id);
+      const prs = await fetchRepoPRs(octokit, workspace.githubOrg, repo.name, { maxPages: 1 });
+      const cohortRegexRulesParsed = parseCohortRegexRules(repo.cohortRegexRules);
+
+      const samples = prs.slice(0, 30).map((pr) => {
+        const cohort = detectCohort(new Date(pr.created_at), cohortRules);
+        const regexByCohort = findNicknameRegexByCohort(cohortRegexRulesParsed, cohort);
+        const effectiveRegex = regexByCohort
+          ? new RegExp(regexByCohort)
+          : repo.nicknameRegex
+            ? new RegExp(repo.nicknameRegex)
+            : workspaceRegex;
+        const match = pr.title.match(effectiveRegex);
+        return { title: pr.title, matched: !!match, extracted: match?.[1]?.trim() ?? null, cohort };
+      });
+
+      const matchedCount = samples.filter((s) => s.matched).length;
+      return {
+        id: repo.id,
+        name: repo.name,
+        total: samples.length,
+        matched: matchedCount,
+        unmatched: samples.length - matchedCount,
+        nicknameRegex: repo.nicknameRegex,
+        cohortRegexRules: parseCohortRegexRules(repo.cohortRegexRules),
+        samples,
+      };
+    },
+
     deleteRepo: (id: number) => missionRepoRepo.deleteWithSubmissions(id),
+
+    deleteAllRepos: async () => {
+      const workspace = await workspaceService.getOrThrow();
+      return missionRepoRepo.deleteAllWithSubmissions(workspace.id);
+    },
   };
 }
 

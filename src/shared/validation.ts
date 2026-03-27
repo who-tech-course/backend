@@ -25,12 +25,13 @@ export function parseNullableString(value: unknown, fieldName: string): string |
 export function parseWorkspaceUpdateInput(body: unknown): {
   nicknameRegex?: string;
   cohortRules?: CohortRule[];
+  blogSyncEnabled?: boolean;
 } {
   if (!isRecord(body)) {
     badRequest('invalid body');
   }
 
-  const { nicknameRegex, cohortRules } = body;
+  const { nicknameRegex, cohortRules, blogSyncEnabled } = body;
 
   if (nicknameRegex !== undefined && typeof nicknameRegex !== 'string') {
     badRequest('invalid nicknameRegex');
@@ -40,9 +41,14 @@ export function parseWorkspaceUpdateInput(body: unknown): {
     badRequest('invalid cohortRules');
   }
 
+  if (blogSyncEnabled !== undefined && typeof blogSyncEnabled !== 'boolean') {
+    badRequest('invalid blogSyncEnabled');
+  }
+
   return {
     ...(nicknameRegex !== undefined ? { nicknameRegex } : {}),
     ...(cohortRules !== undefined ? { cohortRules } : {}),
+    ...(blogSyncEnabled !== undefined ? { blogSyncEnabled } : {}),
   };
 }
 
@@ -58,6 +64,9 @@ export function parseRepoCreateInput(body: unknown): {
   candidateReason?: string | null;
   nicknameRegex?: string;
   cohortRegexRules?: CohortRegexRule[];
+  cohorts?: number[];
+  level?: number | null;
+  order?: number;
 } {
   if (!isRecord(body)) {
     badRequest('invalid body');
@@ -75,6 +84,9 @@ export function parseRepoCreateInput(body: unknown): {
     candidateReason,
     nicknameRegex,
     cohortRegexRules,
+    cohorts,
+    level,
+    order,
   } = body;
 
   if (githubRepoId !== undefined && typeof githubRepoId !== 'number') {
@@ -117,6 +129,18 @@ export function parseRepoCreateInput(body: unknown): {
     badRequest('invalid cohortRegexRules');
   }
 
+  if (cohorts !== undefined && !isNumberArray(cohorts)) {
+    badRequest('invalid cohorts');
+  }
+
+  if (level !== undefined && level !== null && typeof level !== 'number') {
+    badRequest('invalid level');
+  }
+
+  if (order !== undefined && typeof order !== 'number') {
+    badRequest('invalid order');
+  }
+
   return {
     ...(githubRepoId !== undefined ? { githubRepoId } : {}),
     name,
@@ -129,6 +153,9 @@ export function parseRepoCreateInput(body: unknown): {
     ...(candidateReason !== undefined ? { candidateReason } : {}),
     ...(nicknameRegex !== undefined ? { nicknameRegex } : {}),
     ...(cohortRegexRules !== undefined ? { cohortRegexRules } : {}),
+    ...(cohorts !== undefined ? { cohorts } : {}),
+    ...(level !== undefined ? { level } : {}),
+    ...(order !== undefined ? { order } : {}),
   };
 }
 
@@ -141,12 +168,27 @@ export function parseRepoUpdateInput(body: unknown): {
   candidateReason?: string | null;
   nicknameRegex?: string | null;
   cohortRegexRules?: CohortRegexRule[] | null;
+  cohorts?: number[] | null;
+  level?: number | null;
+  order?: number;
 } {
   if (!isRecord(body)) {
     badRequest('invalid body');
   }
 
-  const { description, track, type, status, syncMode, candidateReason, nicknameRegex, cohortRegexRules } = body;
+  const {
+    description,
+    track,
+    type,
+    status,
+    syncMode,
+    candidateReason,
+    nicknameRegex,
+    cohortRegexRules,
+    cohorts,
+    level,
+    order,
+  } = body;
 
   if (description !== undefined && description !== null && typeof description !== 'string') {
     badRequest('invalid description');
@@ -180,6 +222,18 @@ export function parseRepoUpdateInput(body: unknown): {
     badRequest('invalid cohortRegexRules');
   }
 
+  if (cohorts !== undefined && cohorts !== null && !isNumberArray(cohorts)) {
+    badRequest('invalid cohorts');
+  }
+
+  if (level !== undefined && level !== null && typeof level !== 'number') {
+    badRequest('invalid level');
+  }
+
+  if (order !== undefined && typeof order !== 'number') {
+    badRequest('invalid order');
+  }
+
   return {
     ...(description !== undefined ? { description } : {}),
     ...(track !== undefined ? { track } : {}),
@@ -189,6 +243,9 @@ export function parseRepoUpdateInput(body: unknown): {
     ...(candidateReason !== undefined ? { candidateReason } : {}),
     ...(nicknameRegex !== undefined ? { nicknameRegex } : {}),
     ...(cohortRegexRules !== undefined ? { cohortRegexRules } : {}),
+    ...(cohorts !== undefined ? { cohorts } : {}),
+    ...(level !== undefined ? { level } : {}),
+    ...(order !== undefined ? { order } : {}),
   };
 }
 
@@ -201,6 +258,10 @@ function isCohortRules(value: unknown): value is CohortRule[] {
     Array.isArray(value) &&
     value.every((rule) => isRecord(rule) && typeof rule['year'] === 'number' && typeof rule['cohort'] === 'number')
   );
+}
+
+function isNumberArray(value: unknown): value is number[] {
+  return Array.isArray(value) && value.every((v) => typeof v === 'number');
 }
 
 function isCohortRegexRules(value: unknown): value is CohortRegexRule[] {

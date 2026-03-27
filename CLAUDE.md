@@ -46,9 +46,9 @@ MissionRepo (DB 등록) → fetchRepoPRs (GitHub API) → parsePRsToSubmissions 
 
 ### DB 스키마 핵심
 
-- `Workspace`: githubOrg, nicknameRegex(기본값), cohortRules(JSON)
-- `MissionRepo`: track(frontend|backend|android|**null=공통**), type(individual|integration), status(active|candidate|excluded), nicknameRegex(선택), cohortRegexRules(JSON)
-- `Member`: githubId, nickname, manualNickname, nicknameStats(JSON), cohort, blog
+- `Workspace`: githubOrg, nicknameRegex(기본값), cohortRules(JSON), blogSyncEnabled(bool)
+- `MissionRepo`: track(frontend|backend|android|**null=공통**), type(individual|integration), status(active|candidate|excluded), syncMode(continuous|once), lastSyncAt, nicknameRegex(선택), cohortRegexRules(JSON), cohorts(JSON 기수배열 e.g. `[7,8]`), level(Int? 1~4), order(Int 정렬순서)
+- `Member`: githubId, nickname, manualNickname, nicknameStats(JSON), cohort, blog, roles(JSON 배열 e.g. `["crew","reviewer"]`)
 - `Submission`: prNumber, prUrl, memberId, missionRepoId
 - `BlogPost`: url, title, publishedAt, memberId (30일 보관)
 - `BlogPostLatest`: url, title, publishedAt, memberId (7일 스냅샷, sync마다 전체 갱신)
@@ -58,19 +58,25 @@ MissionRepo (DB 등록) → fetchRepoPRs (GitHub API) → parsePRsToSubmissions 
 ```
 GET  /admin/status                    — 수집 현황 (memberCount, lastSyncAt)
 GET  /admin/workspace                 — workspace 설정 조회
-PUT  /admin/workspace                 — nicknameRegex, cohortRules 수정
-GET  /admin/repos                     — 미션 레포 목록 (?status=active|candidate|excluded)
-POST /admin/repos                     — 레포 추가 (name, repoUrl, track, type?, nicknameRegex?, cohortRegexRules?)
-POST /admin/repos/discover            — 조직 공개 레포 탐색 → candidate 갱신
-PATCH /admin/repos/:id                — track, nicknameRegex, cohortRegexRules 등 수정
+PUT  /admin/workspace                 — nicknameRegex, cohortRules, blogSyncEnabled 수정
+GET  /admin/repos                     — 미션 레포 목록 (?status=)
+POST /admin/repos                     — 레포 추가 (name, repoUrl, track, type?, syncMode?, cohorts?, level?, order?, nicknameRegex?, cohortRegexRules?)
+POST /admin/repos/discover            — 조직 공개 레포 탐색 → once candidate 갱신 (precourse 제외)
+PATCH /admin/repos/:id                — track, status, syncMode, cohorts, level, order, nicknameRegex, cohortRegexRules 등 수정
+DELETE /admin/repos                   — 전체 레포 + 관련 submission 삭제
 DELETE /admin/repos/:id               — 레포 + 관련 submission 트랜잭션 삭제
 POST /admin/repos/:id/sync            — 단건 레포 sync
+GET  /admin/repos/:id/validate-regex  — 현재 정규식을 최근 PR(1페이지)에 적용 → matched/unmatched 통계
 GET  /admin/repos/:id/detect-regex    — PR 샘플 기반 닉네임 정규식 자동 감지
-POST /admin/sync                      — 전체 workspace sync 수동 실행
-GET  /admin/members                   — 멤버 목록 (?q=&cohort=&hasBlog=)
-PATCH /admin/members/:id              — manualNickname, blog 수정
+POST /admin/sync                      — once+미수집 레포만 대상으로 전체 sync (SSE 없이)
+GET  /admin/sync/stream               — sync 진행 SSE (?token= 인증, progress/done/error 이벤트)
+GET  /admin/members                   — 멤버 목록 (?q=&cohort=&hasBlog=&track=&role=)
+POST /admin/members                   — 멤버 수동 생성 (githubId, nickname?, cohort?, roles?, blog?)
+GET  /admin/members/:id/blog-posts    — 블로그 글 목록 (archive 30일 + latest 7일)
+PATCH /admin/members/:id              — manualNickname, blog, roles 수정
+DELETE /admin/members                 — 전체 멤버 + submissions + blogPosts 삭제
 DELETE /admin/members/:id             — 멤버 + submissions + blogPosts 삭제
-POST /admin/blog/sync                 — 블로그 RSS 전체 sync
+POST /admin/blog/sync                 — 블로그 RSS 전체 sync (blogSyncEnabled 체크)
 POST /admin/blog/backfill             — GitHub profile blog 백필 (?limit=30)
 ```
 
@@ -87,7 +93,7 @@ POST /admin/blog/backfill             — GitHub profile blog 백필 (?limit=30)
 ## GitHub Actions
 
 - `test.yml` — PR 시 unit 테스트 (develop/main 대상)
-- `deploy.yml` — develop 푸시 시 SSH 자동 배포 (prisma migrate → pm2 restart)
+- `deploy.yml` — develop 푸시 시 SSH 자동 배포 (`git checkout -- .` → pull → npm install → prisma migrate → pm2 restart)
 - `sync.yml` — `workflow_dispatch` 수동 트리거 전용 (cron 없음)
   - Secrets 필요: `SYNC_URL` (서버 URL), `ADMIN_SECRET`
 - `blog-check.yml` — 매시간 cron `POST /admin/blog/sync` 호출 (GitHub API 미사용, RSS only)
@@ -113,5 +119,6 @@ ADMIN_SECRET=...
 ## 예정 작업
 
 - 멤버 검색 API: `GET /members/search?q=`, `GET /members/:githubId`
-- 블로그 RSS 체크 → GitHub Actions scheduled workflow
-- Member.role 필드: crew | coach | applicant (v2~)
+- 멤버 아카이브 페이지: 기수 + 레벨별 레포 PR 목록을 마크다운 표로 생성
+  - `MissionRepo.cohorts`, `level`, `order` 필드 기반으로 그룹핑/정렬
+- 블로그 새 글 알림 (GitHub Actions → 슬랙 등)

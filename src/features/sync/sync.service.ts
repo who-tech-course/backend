@@ -148,21 +148,34 @@ export function createSyncService(deps: {
   const syncWorkspace = async (
     octokit: Octokit,
     workspaceId: number,
+    onProgress?: (step: { repo: string; done: number; total: number; synced: number }) => void,
+    cohort?: number,
   ): Promise<{ totalSynced: number; reposSynced: number }> => {
     const workspace = await workspaceRepo.findByIdOrThrow(workspaceId);
     const cohortRules: CohortRule[] = JSON.parse(workspace.cohortRules);
     const workspaceRegex = new RegExp(workspace.nicknameRegex);
 
     const repos = await missionRepoRepo.findMany({ workspaceId });
-    // once 레포는 lastSyncAt이 없을 때(첫 sync)만 실행
-    const activeRepos = repos.filter(
-      (r) => r.status === 'active' && (r.syncMode === 'continuous' || r.lastSyncAt === null),
-    );
+    // 전체 sync는 한번만 돌릴 레포 중 아직 sync되지 않은 것만 실행
+    const activeRepos = repos.filter((r) => {
+      if (r.status !== 'active' || r.syncMode !== 'once' || r.lastSyncAt !== null) return false;
+      if (cohort != null) {
+        try {
+          const repoCohorts: number[] = r.cohorts ? JSON.parse(r.cohorts) : [];
+          if (!repoCohorts.includes(cohort)) return false;
+        } catch {
+          return false;
+        }
+      }
+      return true;
+    });
 
     let totalSynced = 0;
-    for (const repo of activeRepos) {
+    for (let i = 0; i < activeRepos.length; i++) {
+      const repo = activeRepos[i]!;
       const { synced } = await syncRepo(octokit, workspaceId, workspace.githubOrg, repo, workspaceRegex, cohortRules);
       totalSynced += synced;
+      onProgress?.({ repo: repo.name, done: i + 1, total: activeRepos.length, synced });
     }
 
     await workspaceRepo.touch(workspaceId);
