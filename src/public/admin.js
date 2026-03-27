@@ -410,9 +410,9 @@ function renderMembers() {
       </td>
       <td>${member.blog ? `<a class="link" href="${member.blog}" target="_blank">${member.blog}</a>` : '-'}</td>
       <td>
-        ${member.blogPosts.length > 0 ? `
+        ${member.blogPostsLatest.length > 0 ? `
           <div class="post-list">
-            ${member.blogPosts.map((post) => `
+            ${member.blogPostsLatest.map((post) => `
               <div class="post-item">
                 <a href="${post.url}" target="_blank">${escapeHtml(post.title)}</a>
                 <div class="muted">${new Date(post.publishedAt).toLocaleDateString('ko-KR')}</div>
