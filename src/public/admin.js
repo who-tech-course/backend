@@ -140,23 +140,16 @@ function setRepoTab(tab) {
   repoPageContinuous = 1;
   repoPageOnce = 1;
   document.getElementById('tab-base').classList.toggle('active', tab === 'base');
-  document.getElementById('tab-precourse').classList.toggle('active', tab === 'precourse');
   document.getElementById('tab-common').classList.toggle('active', tab === 'common');
   document.getElementById('tab-excluded').classList.toggle('active', tab === 'excluded');
+  document.getElementById('tab-precourse').classList.toggle('active', tab === 'precourse');
   const trackFilter = document.getElementById('repo-track-filter');
-  trackFilter.style.display = tab === 'common' ? 'none' : '';
+  trackFilter.style.display = tab === 'common' || tab === 'excluded' ? 'none' : '';
   renderRepos();
 }
 
-function isPrecourseRepo(repo) {
-  return repo.name.toLowerCase().includes('precourse');
-}
-
 function getRepoTabCategory(repo) {
-  if (isPrecourseRepo(repo)) return 'precourse';
-  if (repo.status === 'excluded') return 'excluded';
-  if (repo.track == null) return 'common';
-  return 'base';
+  return repo.tabCategory ?? (repo.status === 'excluded' ? 'excluded' : repo.track == null ? 'common' : 'base');
 }
 
 function patchRepo(id, data) {
@@ -180,17 +173,17 @@ function moveRepoCategory(id, target) {
   if (!repo) return;
 
   if (target === 'precourse') {
-    toast('프리코스 탭은 레포 이름에 precourse가 포함되면 자동 분류됩니다.');
+    patchRepo(id, { tabCategory: 'precourse', status: repo.status === 'excluded' ? 'candidate' : repo.status });
     return;
   }
 
   if (target === 'excluded') {
-    patchRepo(id, { status: 'excluded' });
+    patchRepo(id, { tabCategory: 'excluded', status: 'excluded' });
     return;
   }
 
   if (target === 'common') {
-    patchRepo(id, { status: repo.status === 'excluded' ? 'candidate' : repo.status, track: null });
+    patchRepo(id, { tabCategory: 'common', status: repo.status === 'excluded' ? 'candidate' : repo.status, track: null });
     return;
   }
 
@@ -199,7 +192,7 @@ function moveRepoCategory(id, target) {
       toast('기준 레포로 옮기려면 먼저 트랙을 지정하세요.');
       return;
     }
-    patchRepo(id, { status: repo.status === 'excluded' ? 'candidate' : repo.status });
+    patchRepo(id, { tabCategory: 'base', status: repo.status === 'excluded' ? 'candidate' : repo.status });
   }
 }
 
@@ -300,10 +293,10 @@ function repoRow(repo) {
   const hasCustomRegex = !!(repo.nicknameRegex || repo.cohortRegexRules?.length);
   const currentCategory = getRepoTabCategory(repo);
   const tabButtons = [
-    { key: 'base', label: '기준', disabled: repo.track == null || currentCategory === 'precourse' },
-    { key: 'precourse', label: '프리코스', disabled: !isPrecourseRepo(repo) },
-    { key: 'common', label: '공통', disabled: currentCategory === 'precourse' },
-    { key: 'excluded', label: '제외', disabled: currentCategory === 'precourse' },
+    { key: 'base', label: '기준', disabled: repo.track == null },
+    { key: 'common', label: '공통', disabled: false },
+    { key: 'excluded', label: '제외', disabled: false },
+    { key: 'precourse', label: '프리코스', disabled: false },
   ]
     .map(({ key, label, disabled }) => {
       const active = currentCategory === key;
@@ -375,13 +368,8 @@ function renderRepos() {
   const track = document.getElementById('repo-track-filter').value;
 
   const filtered = repoList.filter((repo) => {
-    const isCommon = repo.track === null;
-    const isPrecourse = isPrecourseRepo(repo);
-    if (repoTab === 'precourse' && !isPrecourse) return false;
-    if (repoTab !== 'precourse' && isPrecourse) return false;
-    if (repoTab === 'base' && (isCommon || repo.status === 'excluded')) return false;
-    if (repoTab === 'common' && (!isCommon || repo.status === 'excluded')) return false;
-    if (repoTab === 'excluded' && repo.status !== 'excluded') return false;
+    const category = getRepoTabCategory(repo);
+    if (repoTab !== category) return false;
     const status = repoTab === 'excluded' ? 'excluded' : statusFilter;
     if (search && !repo.name.toLowerCase().includes(search)) return false;
     if (status && repo.status !== status) return false;
@@ -467,6 +455,7 @@ function addRepo() {
     description: document.getElementById('repo-description').value.trim() || null,
     track: document.getElementById('repo-track').value || null,
     type: document.getElementById('repo-type').value,
+    tabCategory: document.getElementById('repo-tab-category').value,
     status: document.getElementById('repo-status').value,
     syncMode: document.getElementById('repo-sync-mode').value,
     nicknameRegex: document.getElementById('repo-regex').value.trim() || null,
@@ -493,6 +482,7 @@ function addRepo() {
       ['repo-name', 'repo-url', 'repo-description', 'repo-regex', 'repo-cohort-regex-rules'].forEach((id) => {
         document.getElementById(id).value = '';
       });
+      document.getElementById('repo-tab-category').value = 'base';
       toast('레포 추가 완료');
       return loadRepos();
     })
@@ -771,9 +761,14 @@ function renderMembers() {
   tbody.innerHTML = memberList.map((member) => `
     <tr>
       <td>
-        <div class="stack">
-          <strong>${escapeHtml(member.githubId)}</strong>
-          <a class="link" href="https://github.com/${member.githubId}" target="_blank">GitHub</a>
+        <div class="stack inline">
+          ${member.avatarUrl
+            ? `<img class="avatar" src="${member.avatarUrl}" alt="${escapeHtml(member.githubId)} avatar" />`
+            : `<span class="avatar-fallback">${escapeHtml((member.githubId ?? '?').slice(0, 2).toUpperCase())}</span>`}
+          <div class="stack">
+            <strong>${escapeHtml(member.githubId)}</strong>
+            <a class="link" href="https://github.com/${member.githubId}" target="_blank">GitHub</a>
+          </div>
         </div>
       </td>
       <td>

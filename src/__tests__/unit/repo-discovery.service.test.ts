@@ -2,7 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 import { discoverMissionRepos } from '../../features/repo/repo-discovery.service.js';
 
 describe('discoverMissionRepos', () => {
-  it('미션 레포 후보를 추려낸다', () => {
+  it('조직 레포를 candidate/excluded로 분류한다', () => {
     const repos = discoverMissionRepos([
       {
         id: 1,
@@ -24,8 +24,11 @@ describe('discoverMissionRepos', () => {
       },
     ]);
 
-    expect(repos).toHaveLength(1);
+    expect(repos).toHaveLength(2);
     expect(repos[0]?.name).toBe('ts-and-learning');
     expect(repos[0]?.track).toBe('frontend');
+    expect(repos[0]?.status).toBe('candidate');
+    expect(repos[1]?.name).toBe('woowacourse-docs');
+    expect(repos[1]?.status).toBe('excluded');
   });
 });

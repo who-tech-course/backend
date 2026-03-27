@@ -79,6 +79,7 @@ export function createRepoService(deps: {
       description?: string | null;
       track: string | null;
       type?: string;
+      tabCategory?: string;
       status?: string;
       syncMode?: string;
       candidateReason?: string | null;
@@ -95,6 +96,7 @@ export function createRepoService(deps: {
         description: input.description ?? null,
         track: input.track,
         type: input.type ?? 'individual',
+        tabCategory: input.tabCategory ?? (input.track === null ? 'common' : 'base'),
         status: input.status ?? 'active',
         syncMode: input.syncMode ?? 'continuous',
         candidateReason: input.candidateReason ?? null,
@@ -113,6 +115,7 @@ export function createRepoService(deps: {
         description?: string | null;
         track?: string | null;
         type?: string;
+        tabCategory?: string;
         status?: string;
         syncMode?: string;
         candidateReason?: string | null;
@@ -126,6 +129,7 @@ export function createRepoService(deps: {
         ...(input.description !== undefined ? { description: input.description } : {}),
         ...(input.track !== undefined ? { track: input.track } : {}),
         ...(input.type !== undefined ? { type: input.type } : {}),
+        ...(input.tabCategory !== undefined ? { tabCategory: input.tabCategory } : {}),
         ...(input.status !== undefined ? { status: input.status } : {}),
         ...(input.syncMode !== undefined ? { syncMode: input.syncMode } : {}),
         ...(input.candidateReason !== undefined ? { candidateReason: input.candidateReason } : {}),
@@ -176,6 +180,7 @@ export function createRepoService(deps: {
             description: candidate.description,
             track: existing.track ?? candidate.track,
             type: existing.type || candidate.type,
+            tabCategory: existing.tabCategory ?? candidate.tabCategory,
             candidateReason: candidate.candidateReason,
             ...(existing.status === 'active' ? {} : { status: candidate.status }),
           });
@@ -188,6 +193,7 @@ export function createRepoService(deps: {
             description: candidate.description,
             track: candidate.track,
             type: candidate.type,
+            tabCategory: candidate.tabCategory,
             status: candidate.status,
             syncMode: 'once',
             candidateReason: candidate.candidateReason,

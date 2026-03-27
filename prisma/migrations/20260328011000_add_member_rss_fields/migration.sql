@@ -1,4 +1,0 @@
-ALTER TABLE "Member" ADD COLUMN "rssStatus" TEXT NOT NULL DEFAULT 'unknown';
-ALTER TABLE "Member" ADD COLUMN "rssUrl" TEXT;
-ALTER TABLE "Member" ADD COLUMN "rssCheckedAt" DATETIME;
-ALTER TABLE "Member" ADD COLUMN "rssError" TEXT;

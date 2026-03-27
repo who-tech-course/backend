@@ -91,7 +91,18 @@ export async function fetchRepoPRs(
   return allPRs;
 }
 
-export async function fetchUserBlogUrl(octokit: Octokit, username: string): Promise<string | null> {
+export async function fetchUserProfile(
+  octokit: Octokit,
+  username: string,
+): Promise<{ blog: string | null; avatarUrl: string | null }> {
   const { data } = await octokit.users.getByUsername({ username });
-  return normalizeBlogUrl(data.blog);
+  return {
+    blog: normalizeBlogUrl(data.blog),
+    avatarUrl: data.avatar_url ?? null,
+  };
+}
+
+export async function fetchUserBlogUrl(octokit: Octokit, username: string): Promise<string | null> {
+  const { blog } = await fetchUserProfile(octokit, username);
+  return blog;
 }

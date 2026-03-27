@@ -17,6 +17,7 @@ export type DiscoveredRepo = {
   description: string | null;
   track: string | null;
   type: string;
+  tabCategory: 'base' | 'common' | 'excluded' | 'precourse';
   status: 'candidate' | 'excluded';
   candidateReason: string;
 };
@@ -100,6 +101,7 @@ function classifyMissionRepo(repo: OrgRepo): DiscoveredRepo {
       description: repo.description,
       track: inferTrack(lowerName, repo.language),
       type: inferType(lowerName),
+      tabCategory: 'excluded',
       status: 'excluded',
       candidateReason: 'exclude keyword',
     };
@@ -118,18 +120,23 @@ function classifyMissionRepo(repo: OrgRepo): DiscoveredRepo {
       description: repo.description,
       track: inferTrack(lowerName, repo.language),
       type: inferType(lowerName),
+      tabCategory: lowerName.includes('precourse') ? 'precourse' : 'excluded',
       status: 'excluded',
-      candidateReason: 'no mission signal',
+      candidateReason: lowerName.includes('precourse') ? 'precourse keyword' : 'no mission signal',
     };
   }
+
+  const track = inferTrack(lowerName, repo.language);
+  const tabCategory = lowerName.includes('precourse') ? 'precourse' : track === null ? 'common' : 'base';
 
   return {
     githubRepoId: repo.id,
     name: repo.name,
     repoUrl: repo.html_url,
     description: repo.description,
-    track: inferTrack(lowerName, repo.language),
+    track,
     type: inferType(lowerName),
+    tabCategory,
     status: 'candidate',
     candidateReason: [...matchedPrefixes, ...matchedKeywords].join(', '),
   };

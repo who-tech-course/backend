@@ -77,9 +77,9 @@
 
         <div class="tabs">
           <button class="tab active" id="tab-base" onclick="setRepoTab('base')">기준 레포</button>
-          <button class="tab" id="tab-precourse" onclick="setRepoTab('precourse')">프리코스</button>
           <button class="tab" id="tab-common" onclick="setRepoTab('common')">공통 미션</button>
           <button class="tab" id="tab-excluded" onclick="setRepoTab('excluded')">제외된 레포</button>
+          <button class="tab" id="tab-precourse" onclick="setRepoTab('precourse')">프리코스</button>
         </div>
 
         <div class="toolbar">
@@ -156,6 +156,12 @@
             <option value="individual">individual</option>
             <option value="integration">integration</option>
           </select>
+          <select id="repo-tab-category">
+            <option value="base">기준</option>
+            <option value="common">공통</option>
+            <option value="excluded">제외</option>
+            <option value="precourse">프리코스</option>
+          </select>
           <select id="repo-status">
             <option value="active">active</option>
             <option value="candidate">candidate</option>
@@ -230,7 +236,7 @@
           <table>
             <thead>
               <tr>
-                <th>GitHub ID</th>
+                <th>프로필</th>
                 <th>닉네임</th>
                 <th>역할</th>
                 <th>기수</th>

@@ -28,6 +28,7 @@ model Member {
   nickname       String?
   manualNickname String?
   nicknameStats  String?      // JSON: [{"nickname":"...", "count":2, "lastSeenAt":"..."}]
+  avatarUrl      String?
   cohort         Int?
   blog           String?
   rssStatus      String       @default("unknown") // unknown | available | unavailable | error
@@ -54,6 +55,7 @@ model MissionRepo {
   description   String?
   track         String?      // frontend | backend | android | null(공통 미션)
   type          String       @default("individual") // individual | integration
+  tabCategory   String       @default("base") // base | common | excluded | precourse
   status        String       @default("active") // active | candidate | excluded
   candidateReason String?
   nicknameRegex String?      // null이면 Workspace.nicknameRegex fallback

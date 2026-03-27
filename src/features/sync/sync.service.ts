@@ -6,7 +6,7 @@ import type { WorkspaceRepository } from '../../db/repositories/workspace.reposi
 import { findNicknameRegexByCohort, parseCohortRegexRules, parseCohorts } from '../../shared/cohort-regex.js';
 import { HttpError } from '../../shared/http.js';
 import { mergeNicknameStat, resolveDisplayNickname } from '../../shared/nickname.js';
-import { fetchRepoPRs, fetchUserBlogUrl, parseNickname, detectCohort } from './github.service.js';
+import { fetchRepoPRs, fetchUserProfile, parseNickname, detectCohort } from './github.service.js';
 import type { CohortRegexRule, CohortRule, ParsedSubmission } from '../../shared/types/index.js';
 
 type RawPR = {
@@ -90,7 +90,7 @@ export function createSyncService(deps: {
       cohortRules,
       parseCohortRegexRules(repo.cohortRegexRules),
     );
-    const blogCache = new Map<string, string | null>();
+    const profileCache = new Map<string, { blog: string | null; avatarUrl: string | null }>();
     let synced = 0;
     const failures: { prNumber: number; prUrl: string; error: string }[] = [];
 
@@ -109,11 +109,25 @@ export function createSyncService(deps: {
         );
 
         let blog = existingMember?.blog ?? null;
+        let avatarUrl = existingMember?.avatarUrl ?? null;
         if (!blog) {
-          if (!blogCache.has(s.githubId)) {
-            blogCache.set(s.githubId, await fetchUserBlogUrl(octokit, s.githubId).catch(() => null));
+          if (!profileCache.has(s.githubId)) {
+            profileCache.set(
+              s.githubId,
+              await fetchUserProfile(octokit, s.githubId).catch(() => ({ blog: null, avatarUrl: null })),
+            );
           }
-          blog = blogCache.get(s.githubId) ?? null;
+          const profile = profileCache.get(s.githubId) ?? { blog: null, avatarUrl: null };
+          blog = profile.blog;
+          avatarUrl = profile.avatarUrl;
+        } else if (!avatarUrl) {
+          if (!profileCache.has(s.githubId)) {
+            profileCache.set(
+              s.githubId,
+              await fetchUserProfile(octokit, s.githubId).catch(() => ({ blog: null, avatarUrl: null })),
+            );
+          }
+          avatarUrl = profileCache.get(s.githubId)?.avatarUrl ?? null;
         }
 
         const member = await memberRepo.upsert({
@@ -122,6 +136,7 @@ export function createSyncService(deps: {
             githubId: s.githubId,
             nickname: displayNickname,
             cohort: s.cohort,
+            avatarUrl,
             blog,
             nicknameStats: JSON.stringify(nicknameStats),
             workspaceId,
@@ -129,6 +144,7 @@ export function createSyncService(deps: {
           update: {
             nickname: displayNickname,
             cohort: s.cohort,
+            ...(existingMember?.avatarUrl ? {} : { avatarUrl }),
             ...(existingMember?.blog ? {} : { blog }),
             nicknameStats: JSON.stringify(nicknameStats),
           },

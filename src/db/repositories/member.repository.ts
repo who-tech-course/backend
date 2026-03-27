@@ -49,6 +49,7 @@ export function createMemberRepository(db: PrismaClient) {
           nickname: true,
           manualNickname: true,
           nicknameStats: true,
+          avatarUrl: true,
           blog: true,
           rssStatus: true,
           rssUrl: true,
@@ -66,6 +67,7 @@ export function createMemberRepository(db: PrismaClient) {
       id: number,
       data: {
         manualNickname?: string | null;
+        avatarUrl?: string | null;
         blog?: string | null;
         roles?: string;
         rssStatus?: string;
@@ -79,6 +81,7 @@ export function createMemberRepository(db: PrismaClient) {
       id: number,
       data: {
         blog?: string | null;
+        avatarUrl?: string | null;
         rssStatus?: string;
         rssUrl?: string | null;
         rssCheckedAt?: Date | null;

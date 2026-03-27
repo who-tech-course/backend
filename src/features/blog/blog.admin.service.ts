@@ -2,7 +2,7 @@ import type { Octokit } from '@octokit/rest';
 import type { MemberRepository } from '../../db/repositories/member.repository.js';
 import type { WorkspaceService } from '../workspace/workspace.service.js';
 import type { BlogService } from './blog.service.js';
-import { fetchUserBlogUrl } from '../sync/github.service.js';
+import { fetchUserProfile } from '../sync/github.service.js';
 
 export function createBlogAdminService(deps: {
   memberRepo: MemberRepository;
@@ -36,13 +36,14 @@ export function createBlogAdminService(deps: {
 
       for (const member of members) {
         try {
-          const blog = await fetchUserBlogUrl(octokit, member.githubId);
-          if (!blog) {
+          const profile = await fetchUserProfile(octokit, member.githubId);
+          if (!profile.blog && !profile.avatarUrl) {
             missing++;
             continue;
           }
           await memberRepo.patch(member.id, {
-            blog,
+            blog: profile.blog,
+            avatarUrl: profile.avatarUrl,
             rssStatus: 'unknown',
             rssUrl: null,
             rssCheckedAt: null,

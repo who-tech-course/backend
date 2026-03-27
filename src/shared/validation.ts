@@ -59,6 +59,7 @@ export function parseRepoCreateInput(body: unknown): {
   description?: string | null;
   track: string | null;
   type?: string;
+  tabCategory?: string;
   status?: string;
   syncMode?: string;
   candidateReason?: string | null;
@@ -78,6 +79,7 @@ export function parseRepoCreateInput(body: unknown): {
     description,
     track,
     type,
+    tabCategory,
     status,
     syncMode,
     candidateReason,
@@ -105,6 +107,10 @@ export function parseRepoCreateInput(body: unknown): {
 
   if (type !== undefined && typeof type !== 'string') {
     badRequest('invalid type');
+  }
+
+  if (tabCategory !== undefined && typeof tabCategory !== 'string') {
+    badRequest('invalid tabCategory');
   }
 
   if (status !== undefined && typeof status !== 'string') {
@@ -142,6 +148,7 @@ export function parseRepoCreateInput(body: unknown): {
     ...(description !== undefined ? { description } : {}),
     track: track ?? null,
     ...(type !== undefined ? { type } : {}),
+    ...(tabCategory !== undefined ? { tabCategory } : {}),
     ...(status !== undefined ? { status } : {}),
     ...(syncMode !== undefined ? { syncMode } : {}),
     ...(candidateReason !== undefined ? { candidateReason } : {}),
@@ -156,6 +163,7 @@ export function parseRepoUpdateInput(body: unknown): {
   description?: string | null;
   track?: string | null;
   type?: string;
+  tabCategory?: string;
   status?: string;
   syncMode?: string;
   candidateReason?: string | null;
@@ -172,6 +180,7 @@ export function parseRepoUpdateInput(body: unknown): {
     description,
     track,
     type,
+    tabCategory,
     status,
     syncMode,
     candidateReason,
@@ -191,6 +200,10 @@ export function parseRepoUpdateInput(body: unknown): {
 
   if (type !== undefined && typeof type !== 'string') {
     badRequest('invalid type');
+  }
+
+  if (tabCategory !== undefined && typeof tabCategory !== 'string') {
+    badRequest('invalid tabCategory');
   }
 
   if (status !== undefined && typeof status !== 'string') {
@@ -225,6 +238,7 @@ export function parseRepoUpdateInput(body: unknown): {
     ...(description !== undefined ? { description } : {}),
     ...(track !== undefined ? { track } : {}),
     ...(type !== undefined ? { type } : {}),
+    ...(tabCategory !== undefined ? { tabCategory } : {}),
     ...(status !== undefined ? { status } : {}),
     ...(syncMode !== undefined ? { syncMode } : {}),
     ...(candidateReason !== undefined ? { candidateReason } : {}),
