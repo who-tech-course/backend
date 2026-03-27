@@ -140,11 +140,16 @@ function setRepoTab(tab) {
   repoPageContinuous = 1;
   repoPageOnce = 1;
   document.getElementById('tab-base').classList.toggle('active', tab === 'base');
+  document.getElementById('tab-precourse').classList.toggle('active', tab === 'precourse');
   document.getElementById('tab-common').classList.toggle('active', tab === 'common');
   document.getElementById('tab-excluded').classList.toggle('active', tab === 'excluded');
   const trackFilter = document.getElementById('repo-track-filter');
   trackFilter.style.display = tab === 'common' ? 'none' : '';
   renderRepos();
+}
+
+function isPrecourseRepo(repo) {
+  return repo.name.toLowerCase().includes('precourse');
 }
 
 function patchRepo(id, data) {
@@ -357,6 +362,9 @@ function renderRepos() {
 
   const filtered = repoList.filter((repo) => {
     const isCommon = repo.track === null;
+    const isPrecourse = isPrecourseRepo(repo);
+    if (repoTab === 'precourse' && !isPrecourse) return false;
+    if (repoTab !== 'precourse' && isPrecourse) return false;
     if (repoTab === 'base' && (isCommon || repo.status === 'excluded')) return false;
     if (repoTab === 'common' && (!isCommon || repo.status === 'excluded')) return false;
     if (repoTab === 'excluded' && repo.status !== 'excluded') return false;
