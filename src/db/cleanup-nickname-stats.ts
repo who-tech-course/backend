@@ -19,7 +19,7 @@ async function main() {
     if (cleaned.length === stats.length) continue;
 
     const newStatsValue = stringifyNicknameStats(cleaned);
-    const newNickname = resolveDisplayNickname(member.manualNickname, newStatsValue, member.githubId);
+    const newNickname = resolveDisplayNickname(member.manualNickname, newStatsValue, null);
 
     await db.member.update({
       where: { id: member.id },

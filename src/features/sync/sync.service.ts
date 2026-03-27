@@ -96,7 +96,7 @@ export function createSyncService(deps: {
       const displayNickname = resolveDisplayNickname(
         existingMember?.manualNickname,
         JSON.stringify(nicknameStats),
-        s.nickname,
+        existingMember?.nickname ?? null,
       );
 
       let blog = existingMember?.blog ?? null;
