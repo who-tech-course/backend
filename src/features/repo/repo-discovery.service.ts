@@ -5,6 +5,7 @@ type OrgRepo = {
   name: string;
   html_url: string;
   description: string | null;
+  language: string | null;
   archived: boolean;
   private: boolean;
 };
@@ -53,6 +54,7 @@ export async function fetchOrgRepos(octokit: Octokit, org: string, perPage = 100
         name: repo.name,
         html_url: repo.html_url,
         description: repo.description,
+        language: repo.language ?? null,
         archived: repo.archived ?? false,
         private: repo.private,
       })),
@@ -98,13 +100,13 @@ function classifyMissionRepo(repo: OrgRepo): DiscoveredMissionRepo | null {
     name: repo.name,
     repoUrl: repo.html_url,
     description: repo.description,
-    track: inferTrack(lowerName),
+    track: inferTrack(lowerName, repo.language),
     type: inferType(lowerName),
     candidateReason: [...matchedPrefixes, ...matchedKeywords].join(', '),
   };
 }
 
-function inferTrack(name: string): string | null {
+function inferTrack(name: string, language: string | null): string | null {
   if (name.startsWith('javascript-') || name.startsWith('react-') || name.startsWith('ts-')) {
     return 'frontend';
   }
@@ -117,7 +119,10 @@ function inferTrack(name: string): string | null {
     return 'android';
   }
 
-  // 공통/협업 미션 (언어 prefix 없음) — track 미지정
+  // prefix 없으면 language로 보조 판단
+  if (language === 'Kotlin') return 'android';
+  if (language === 'Java') return 'backend';
+
   return null;
 }
 
