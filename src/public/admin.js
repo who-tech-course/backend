@@ -152,7 +152,9 @@ function repoRow(repo) {
           <span class="muted">${escapeHtml(repo.candidateReason ?? '-')}</span>
         </div>
       </td>
-      <td class="mono" style="cursor:pointer" onclick="editRepoRegex(${repo.id})" title="클릭해서 정규식 수정">${regexText || '<span class="muted">없음</span>'}</td>
+      <td style="cursor:pointer" onclick="editRepoRegex(${repo.id})" title="클릭해서 정규식 수정">
+        ${regexText ? '<span class="pill active" style="font-size:11px">있음</span>' : '<span class="muted">없음</span>'}
+      </td>
       <td class="muted small">${syncedAt}</td>
       <td>
         <div class="actions">
@@ -619,7 +621,7 @@ function renderMembers() {
       <td>
         ${member.blog
           ? `<a class="link" href="${member.blog}" target="_blank" onclick="event.stopPropagation()">${member.blog}</a>
-             <button class="btn-sm btn-ghost" style="margin-top:4px" onclick="openBlogModal(${member.id}, '${escapeHtml(member.nickname ?? member.githubId)}')">글 보기</button>`
+             ${member.blogPostsLatest?.length > 0 ? `<button class="btn-sm btn-ghost" style="margin-top:4px" onclick="openBlogModal(${member.id}, '${escapeHtml(member.nickname ?? member.githubId)}')">글 보기</button>` : ''}`
           : '-'}
       </td>
       <td>
@@ -911,6 +913,84 @@ function closeRegexModal() {
   document.getElementById('regex-modal').style.display = 'none';
   regexModalRepoId = null;
   regexModalResult = null;
+}
+
+function closeValidateModal() {
+  document.getElementById('validate-regex-modal').style.display = 'none';
+}
+
+async function startValidateAllRegex() {
+  const modal = document.getElementById('validate-regex-modal');
+  const progress = document.getElementById('validate-regex-progress');
+  const body = document.getElementById('validate-regex-body');
+  const btn = document.getElementById('validate-regex-btn');
+
+  modal.style.display = 'flex';
+  body.innerHTML = '';
+  btn.disabled = true;
+
+  const activeRepos = repoList.filter((r) => r.status === 'active');
+  const issues = [];
+
+  for (let i = 0; i < activeRepos.length; i++) {
+    const repo = activeRepos[i];
+    progress.innerHTML = `<span class="sub">검증 중 ${i + 1} / ${activeRepos.length} — ${escapeHtml(repo.name)}</span>`;
+
+    try {
+      const result = await fetch(`/admin/repos/${repo.id}/validate-regex`, { headers: authHeaders() }).then((r) =>
+        r.json(),
+      );
+      if (result.total > 0 && result.unmatched > 0) {
+        issues.push(result);
+      }
+    } catch {
+      // 개별 실패는 건너뜀
+    }
+  }
+
+  progress.innerHTML = `<span class="sub">완료 — ${activeRepos.length}개 검증, 이슈 ${issues.length}개</span>`;
+  btn.disabled = false;
+
+  if (issues.length === 0) {
+    body.innerHTML = '<div class="sub" style="padding:16px 0">이슈 없음 ✓</div>';
+    return;
+  }
+
+  body.innerHTML = issues.map((result) => renderValidateIssue(result)).join('<hr style="margin:8px 0;border-color:#e2e8f0">');
+}
+
+function renderValidateIssue(result) {
+  const samplesHtml = result.samples
+    .map(
+      (s) => `
+      <div class="post-item" style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:13px;color:${s.matched ? '#16a34a' : '#dc2626'}">${s.matched ? '✓' : '✗'}</span>
+        <span style="font-size:12px;flex:1">${escapeHtml(s.title)}</span>
+        ${s.extracted ? `<span class="pill crew" style="font-size:11px">${escapeHtml(s.extracted)}</span>` : ''}
+      </div>`,
+    )
+    .join('');
+
+  return `
+    <div style="padding:12px 0">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div>
+          <strong>${escapeHtml(result.name)}</strong>
+          <span class="muted" style="margin-left:8px">${result.matched}/${result.total} 매칭</span>
+        </div>
+        <div class="actions">
+          <button class="btn-sm btn-ghost" onclick="closeValidateModal(); editRepoRegex(${result.id})">정규식 수정</button>
+          <button class="btn-sm btn-ghost" onclick="detectRepoRegex(${result.id}); closeValidateModal()">자동 감지</button>
+          <button class="btn-sm btn-secondary" onclick="dismissValidateIssue(${result.id})">건너뛰기</button>
+        </div>
+      </div>
+      <div id="validate-issue-${result.id}" class="post-list">${samplesHtml}</div>
+    </div>`;
+}
+
+function dismissValidateIssue(id) {
+  const el = document.getElementById(`validate-issue-${id}`);
+  if (el) el.closest('div[style]').style.display = 'none';
 }
 
 function applyDetectedRegex() {

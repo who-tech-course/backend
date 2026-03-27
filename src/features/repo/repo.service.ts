@@ -2,7 +2,11 @@ import type { Octokit } from '@octokit/rest';
 import type { MissionRepoRepository } from '../../db/repositories/mission-repo.repository.js';
 import type { WorkspaceService } from '../workspace/workspace.service.js';
 import type { SyncService } from '../sync/sync.service.js';
-import { parseCohortRegexRules, stringifyCohortRegexRules } from '../../shared/cohort-regex.js';
+import {
+  parseCohortRegexRules,
+  stringifyCohortRegexRules,
+  findNicknameRegexByCohort,
+} from '../../shared/cohort-regex.js';
 import type { CohortRegexRule, CohortRule } from '../../shared/types/index.js';
 import { discoverMissionRepos, fetchOrgRepos } from './repo-discovery.service.js';
 import { fetchRepoPRs, detectCohort } from '../sync/github.service.js';
@@ -225,6 +229,39 @@ export function createRepoService(deps: {
       }
 
       return { samples, suggestion };
+    },
+
+    validateRepoRegex: async (id: number) => {
+      const workspace = await workspaceService.getOrThrow();
+      const cohortRules = JSON.parse(workspace.cohortRules) as CohortRule[];
+      const workspaceRegex = new RegExp(workspace.nicknameRegex);
+      const repo = await missionRepoRepo.findByIdOrThrow(id);
+      const prs = await fetchRepoPRs(octokit, workspace.githubOrg, repo.name, { maxPages: 1 });
+      const cohortRegexRulesParsed = parseCohortRegexRules(repo.cohortRegexRules);
+
+      const samples = prs.slice(0, 30).map((pr) => {
+        const cohort = detectCohort(new Date(pr.created_at), cohortRules);
+        const regexByCohort = findNicknameRegexByCohort(cohortRegexRulesParsed, cohort);
+        const effectiveRegex = regexByCohort
+          ? new RegExp(regexByCohort)
+          : repo.nicknameRegex
+            ? new RegExp(repo.nicknameRegex)
+            : workspaceRegex;
+        const match = pr.title.match(effectiveRegex);
+        return { title: pr.title, matched: !!match, extracted: match?.[1]?.trim() ?? null, cohort };
+      });
+
+      const matchedCount = samples.filter((s) => s.matched).length;
+      return {
+        id: repo.id,
+        name: repo.name,
+        total: samples.length,
+        matched: matchedCount,
+        unmatched: samples.length - matchedCount,
+        nicknameRegex: repo.nicknameRegex,
+        cohortRegexRules: parseCohortRegexRules(repo.cohortRegexRules),
+        samples,
+      };
     },
 
     deleteRepo: (id: number) => missionRepoRepo.deleteWithSubmissions(id),
