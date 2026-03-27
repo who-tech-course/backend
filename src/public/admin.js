@@ -141,6 +141,7 @@ function setRepoTab(tab) {
   repoPageOnce = 1;
   document.getElementById('tab-base').classList.toggle('active', tab === 'base');
   document.getElementById('tab-common').classList.toggle('active', tab === 'common');
+  document.getElementById('tab-excluded').classList.toggle('active', tab === 'excluded');
   const trackFilter = document.getElementById('repo-track-filter');
   trackFilter.style.display = tab === 'common' ? 'none' : '';
   renderRepos();
@@ -313,13 +314,15 @@ function resetRepoPages() {
 
 function renderRepos() {
   const search = document.getElementById('repo-search').value.trim().toLowerCase();
-  const status = document.getElementById('repo-status-filter').value;
+  const statusFilter = document.getElementById('repo-status-filter').value;
   const track = document.getElementById('repo-track-filter').value;
 
   const filtered = repoList.filter((repo) => {
     const isCommon = repo.track === null;
     if (repoTab === 'base' && isCommon) return false;
     if (repoTab === 'common' && !isCommon) return false;
+    if (repoTab === 'excluded' && repo.status !== 'excluded') return false;
+    const status = repoTab === 'excluded' ? 'excluded' : statusFilter;
     if (search && !repo.name.toLowerCase().includes(search)) return false;
     if (status && repo.status !== status) return false;
     if (track && repo.track !== track) return false;
