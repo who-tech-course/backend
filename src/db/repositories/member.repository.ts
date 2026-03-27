@@ -62,8 +62,17 @@ export function createMemberRepository(db: PrismaClient) {
     deleteWithRelations: (id: number) =>
       db.$transaction([
         db.blogPost.deleteMany({ where: { memberId: id } }),
+        db.blogPostLatest.deleteMany({ where: { memberId: id } }),
         db.submission.deleteMany({ where: { memberId: id } }),
         db.member.delete({ where: { id } }),
+      ]),
+
+    deleteAllWithRelations: (workspaceId: number) =>
+      db.$transaction([
+        db.blogPost.deleteMany({ where: { member: { workspaceId } } }),
+        db.blogPostLatest.deleteMany({ where: { member: { workspaceId } } }),
+        db.submission.deleteMany({ where: { member: { workspaceId } } }),
+        db.member.deleteMany({ where: { workspaceId } }),
       ]),
   };
 }

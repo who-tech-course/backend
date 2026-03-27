@@ -737,6 +737,17 @@ function closeBlogModal() {
   document.getElementById('blog-modal').style.display = 'none';
 }
 
+function deleteAllMembers() {
+  if (!confirm('모든 멤버와 관련 submission, 블로그 글을 삭제합니다. 계속할까요?')) return;
+
+  fetch('/admin/members', { method: 'DELETE', headers: authHeaders() })
+    .then(() => {
+      toast('전체 멤버 삭제 완료');
+      return Promise.all([loadMembers(), loadStatus()]);
+    })
+    .catch(() => alert('전체 삭제에 실패했습니다.'));
+}
+
 function deleteMember(id) {
   if (!confirm('멤버와 관련 submission/blog 데이터를 함께 삭제합니다. 계속할까요?')) return;
 

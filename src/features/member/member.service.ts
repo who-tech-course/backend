@@ -75,6 +75,11 @@ export function createMemberService(deps: {
     getMemberBlogPosts: (id: number) => blogPostRepo.findByMember(id),
 
     deleteMember: (id: number) => memberRepo.deleteWithRelations(id),
+
+    deleteAllMembers: async () => {
+      const workspace = await workspaceService.getOrThrow();
+      return memberRepo.deleteAllWithRelations(workspace.id);
+    },
   };
 }
 
