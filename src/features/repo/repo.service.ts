@@ -40,7 +40,6 @@ export function createRepoService(deps: {
     listRepos: async (status?: string) => {
       const workspace = await workspaceService.getOrThrow();
       const repos = await missionRepoRepo.findMany({ workspaceId: workspace.id, ...(status ? { status } : {}) }, [
-        { order: 'asc' },
         { name: 'asc' },
       ]);
       return repos.map(toResponse);
@@ -60,7 +59,6 @@ export function createRepoService(deps: {
       cohortRegexRules?: CohortRegexRule[];
       cohorts?: number[];
       level?: number | null;
-      order?: number;
     }) => {
       const workspace = await workspaceService.getOrThrow();
       const repo = await missionRepoRepo.create({
@@ -77,7 +75,6 @@ export function createRepoService(deps: {
         cohortRegexRules: stringifyCohortRegexRules(input.cohortRegexRules),
         ...(input.cohorts?.length ? { cohorts: JSON.stringify(input.cohorts) } : {}),
         ...(input.level !== undefined ? { level: input.level } : {}),
-        ...(input.order !== undefined ? { order: input.order } : {}),
         workspaceId: workspace.id,
       });
       return toResponse(repo);
@@ -96,7 +93,6 @@ export function createRepoService(deps: {
         cohortRegexRules?: CohortRegexRule[] | null;
         cohorts?: number[] | null;
         level?: number | null;
-        order?: number;
       },
     ) => {
       const repo = await missionRepoRepo.update(id, {
@@ -114,7 +110,6 @@ export function createRepoService(deps: {
           ? { cohorts: input.cohorts === null ? null : JSON.stringify(input.cohorts) }
           : {}),
         ...(input.level !== undefined ? { level: input.level } : {}),
-        ...(input.order !== undefined ? { order: input.order } : {}),
       });
       return toResponse(repo);
     },

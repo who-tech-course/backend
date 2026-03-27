@@ -120,6 +120,7 @@ function loadRepos() {
     .then((repos) => {
       repoList = repos;
       renderRepos();
+      populateCohortRepoSelect();
     });
 }
 
@@ -168,7 +169,6 @@ function repoRow(repo) {
       <td class="muted small">${syncedAt}</td>
       <td>
         <div class="actions">
-          <input type="number" class="order-input" value="${repo.order ?? 0}" onchange="setRepoOrder(${repo.id}, this.value)" title="순서" />
           <button class="btn-sm btn-secondary" onclick="syncRepo(${repo.id}, this)">Sync</button>
           <button class="btn-sm btn-ghost" onclick="detectRepoRegex(${repo.id})">감지</button>
           <button class="btn-sm btn-ghost" onclick="editRepo(${repo.id})">수정</button>
@@ -406,17 +406,6 @@ function deleteRepo(id) {
     .catch(() => alert('레포 삭제에 실패했습니다.'));
 }
 
-function setRepoOrder(id, value) {
-  const order = Number(value);
-  if (isNaN(order)) return;
-  fetch(`/admin/repos/${id}`, {
-    method: 'PATCH',
-    headers: authHeaders('application/json'),
-    body: JSON.stringify({ order }),
-  })
-    .then(() => loadRepos())
-    .catch(() => alert('순서 변경에 실패했습니다.'));
-}
 
 function syncRepo(id, button) {
   button.disabled = true;
@@ -1092,3 +1081,88 @@ document.getElementById('secret-input').addEventListener('keydown', (event) => {
     login();
   }
 });
+
+// ── 기수별 레포 관리 ──────────────────────────────────────────────
+let cohortRepoList = [];
+let cohortRepoSelectedCohort = null;
+
+function loadCohortRepos() {
+  const cohort = Number(document.getElementById('cohort-repo-cohort').value);
+  if (!cohort) { document.getElementById('cohort-repo-table-body').innerHTML = ''; return; }
+  cohortRepoSelectedCohort = cohort;
+  fetch(`/admin/cohort-repos?cohort=${cohort}`, { headers: authHeaders() })
+    .then((r) => r.json())
+    .then((data) => {
+      cohortRepoList = data;
+      renderCohortRepos();
+    })
+    .catch(() => toast('기수 레포 목록 불러오기 실패'));
+}
+
+function renderCohortRepos() {
+  const tbody = document.getElementById('cohort-repo-table-body');
+  if (!cohortRepoList.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="muted" style="text-align:center;padding:16px">추가된 레포 없음</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = cohortRepoList.map((entry) => `
+    <tr>
+      <td class="muted small">${entry.order}</td>
+      <td><strong>${escapeHtml(entry.missionRepo.name)}</strong></td>
+      <td class="muted small">${entry.missionRepo.track ?? '공통'}</td>
+      <td class="muted small">${entry.missionRepo.level != null ? `레벨${entry.missionRepo.level}` : '-'}</td>
+      <td>
+        <div class="actions">
+          <input type="number" class="order-input" value="${entry.order}" onchange="setCohortRepoOrder(${entry.id}, this.value)" title="순서" style="width:52px" />
+          <button class="btn-sm btn-danger" onclick="deleteCohortRepo(${entry.id})">삭제</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function addCohortRepo() {
+  const cohort = cohortRepoSelectedCohort;
+  if (!cohort) { alert('기수를 먼저 선택하세요.'); return; }
+  const select = document.getElementById('cohort-repo-select');
+  const missionRepoId = Number(select.value);
+  if (!missionRepoId) { alert('레포를 선택하세요.'); return; }
+  const order = Number(document.getElementById('cohort-repo-order').value) || 0;
+
+  fetch('/admin/cohort-repos', {
+    method: 'POST',
+    headers: authHeaders('application/json'),
+    body: JSON.stringify({ cohort, missionRepoId, order }),
+  })
+    .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
+    .then(() => { toast('레포 추가됨'); loadCohortRepos(); })
+    .catch(() => alert('추가 실패 (중복일 수 있음)'));
+}
+
+function setCohortRepoOrder(id, value) {
+  const order = Number(value);
+  if (isNaN(order)) return;
+  fetch(`/admin/cohort-repos/${id}`, {
+    method: 'PATCH',
+    headers: authHeaders('application/json'),
+    body: JSON.stringify({ order }),
+  })
+    .then(() => loadCohortRepos())
+    .catch(() => alert('순서 변경 실패'));
+}
+
+function deleteCohortRepo(id) {
+  if (!confirm('이 레포를 기수 목록에서 제거하시겠습니까?')) return;
+  fetch(`/admin/cohort-repos/${id}`, { method: 'DELETE', headers: authHeaders() })
+    .then(() => { toast('제거됨'); loadCohortRepos(); })
+    .catch(() => alert('삭제 실패'));
+}
+
+function populateCohortRepoSelect() {
+  const select = document.getElementById('cohort-repo-select');
+  select.innerHTML = '<option value="">레포 선택</option>' +
+    repoList
+      .filter((r) => r.status === 'active')
+      .map((r) => `<option value="${r.id}">${escapeHtml(r.name)}${r.level != null ? ` (레벨${r.level})` : ''}</option>`)
+      .join('');
+}
