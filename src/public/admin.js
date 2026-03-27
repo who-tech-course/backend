@@ -23,7 +23,7 @@ function login() {
       localStorage.setItem('admin_token', token);
       document.getElementById('login').style.display = 'none';
       document.getElementById('main').style.display = 'block';
-      return Promise.all([loadStatus(), loadWorkspace(), loadRepos(), loadMembers()]);
+      return Promise.all([loadStatus(), loadWorkspace(), loadRepos(), loadMembers(), loadActivityLogs()]);
     })
     .catch(() => alert('잘못된 비밀키입니다.'));
 }
@@ -35,7 +35,7 @@ function tryAutoLogin() {
       if (!response.ok) { localStorage.removeItem('admin_token'); return; }
       document.getElementById('login').style.display = 'none';
       document.getElementById('main').style.display = 'block';
-      return Promise.all([loadStatus(), loadWorkspace(), loadRepos(), loadMembers()]);
+      return Promise.all([loadStatus(), loadWorkspace(), loadRepos(), loadMembers(), loadActivityLogs()]);
     })
     .catch(() => { localStorage.removeItem('admin_token'); });
 }
@@ -968,11 +968,9 @@ function toast(message) {
   }, 2600);
 }
 
-function addLog(msg, type = 'info') {
+function renderLogEntry(ts, type, msg) {
   const body = document.getElementById('log-body');
   if (!body) return;
-  const now = new Date();
-  const ts = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
   const tags = { ok: ' OK ', err: 'ERR', run: 'RUN', info: ' ·· ' };
   const entry = document.createElement('div');
   entry.className = 'log-entry';
@@ -986,9 +984,33 @@ function addLog(msg, type = 'info') {
   }
 }
 
+function addLog(msg, type = 'info') {
+  const now = new Date();
+  const ts = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+  renderLogEntry(ts, type, msg);
+  fetch('/admin/logs', { method: 'POST', headers: authHeaders('application/json'), body: JSON.stringify({ type, message: msg }) }).catch(() => {});
+}
+
+function loadActivityLogs() {
+  return fetch('/admin/logs', { headers: authHeaders() })
+    .then((r) => r.json())
+    .then((logs) => {
+      const body = document.getElementById('log-body');
+      if (!body) return;
+      body.innerHTML = '';
+      [...logs].reverse().forEach(({ type, message, createdAt }) => {
+        const d = new Date(createdAt);
+        const ts = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
+        renderLogEntry(ts, type, message);
+      });
+    })
+    .catch(() => {});
+}
+
 function clearActivityLog() {
-  const body = document.getElementById('log-body');
-  if (body) body.innerHTML = '';
+  fetch('/admin/logs', { method: 'DELETE', headers: authHeaders() })
+    .then(() => { const body = document.getElementById('log-body'); if (body) body.innerHTML = ''; })
+    .catch(() => {});
 }
 
 function toggleActivityLog() {

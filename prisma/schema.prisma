@@ -17,6 +17,7 @@ model Workspace {
   members         Member[]
   missionRepos    MissionRepo[]
   cohortRepos     CohortRepo[]
+  activityLogs    ActivityLog[]
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 }
@@ -109,4 +110,14 @@ model BlogPostLatest {
   publishedAt DateTime
   memberId    Int
   member      Member   @relation(fields: [memberId], references: [id])
+}
+
+// 어드민 활동 로그 — 7일 보관
+model ActivityLog {
+  id          Int       @id @default(autoincrement())
+  type        String    // run | ok | err | info
+  message     String
+  workspaceId Int
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
 }
