@@ -35,6 +35,13 @@ export function createRepoRouter(service: RepoService) {
     }),
   );
 
+  router.get(
+    '/:id/detect-regex',
+    asyncHandler(async (req, res) => {
+      res.json(await service.detectRepoRegex(parseId(req.params['id'])));
+    }),
+  );
+
   router.post(
     '/:id/sync',
     asyncHandler(async (req, res) => {

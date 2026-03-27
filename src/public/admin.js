@@ -4,6 +4,8 @@ let repoList = [];
 let memberList = [];
 let memberSearchTimer = null;
 let repoTab = 'base';
+let regexModalRepoId = null;
+let regexModalResult = null;
 
 function login() {
   token = document.getElementById('secret-input').value;
@@ -123,6 +125,7 @@ function renderRepos() {
       <td>
         <div class="actions">
           <button class="btn-sm btn-secondary" onclick="syncRepo(${repo.id}, this)">Sync</button>
+          <button class="btn-sm btn-ghost" onclick="detectRepoRegex(${repo.id})">감지</button>
           <button class="btn-sm btn-ghost" onclick="editRepo(${repo.id})">수정</button>
           <button class="btn-sm btn-danger" onclick="deleteRepo(${repo.id})">삭제</button>
         </div>
@@ -524,6 +527,112 @@ function toast(message) {
   setTimeout(() => {
     el.style.display = 'none';
   }, 2600);
+}
+
+function detectRepoRegex(id) {
+  regexModalRepoId = id;
+  regexModalResult = null;
+
+  const modal = document.getElementById('regex-modal');
+  const body = document.getElementById('regex-modal-body');
+  const applyBtn = document.getElementById('regex-apply-btn');
+
+  body.innerHTML = '<div class="sub">GitHub PR을 불러오는 중...</div>';
+  applyBtn.disabled = true;
+  modal.style.display = 'flex';
+
+  fetch(`/admin/repos/${id}/detect-regex`, { headers: authHeaders() })
+    .then((response) => {
+      if (!response.ok) throw new Error('failed');
+      return response.json();
+    })
+    .then((result) => {
+      regexModalResult = result;
+      renderRegexModal(result);
+      applyBtn.disabled = false;
+    })
+    .catch(() => {
+      body.innerHTML = '<div class="sub">정규식 감지에 실패했습니다.</div>';
+    });
+}
+
+function renderRegexModal(result) {
+  const body = document.getElementById('regex-modal-body');
+  const { samples, suggestion } = result;
+
+  const samplesHtml = samples.map((sample) => {
+    const cohortLabel = sample.cohort !== null ? `${sample.cohort}기` : '기수 불명';
+    const titlesHtml = sample.titles.map((t) => `<span>${escapeHtml(t)}</span>`).join('');
+    const regexVal = sample.detectedRegex ?? '';
+    return `
+      <div class="regex-sample">
+        <div class="regex-sample-cohort">${escapeHtml(cohortLabel)}</div>
+        <div class="regex-sample-titles">${titlesHtml}</div>
+        <div class="regex-detected">
+          <label>감지된 정규식</label>
+          <div class="regex-input-wrap">
+            <input type="text" class="cohort-regex-input" data-cohort="${sample.cohort ?? ''}" value="${escapeHtml(regexVal)}" placeholder="감지된 정규식 없음" />
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const suggestionRegex = suggestion.nicknameRegex ?? '';
+  const suggestionHtml = `
+    <div style="margin-bottom:16px;">
+      <div class="sub" style="margin-bottom:8px;">전 기수 동일 정규식 (비워두면 기수별로 적용)</div>
+      <input type="text" id="suggestion-regex-input" value="${escapeHtml(suggestionRegex)}" placeholder="기수별 정규식이 다르면 비워두세요" />
+    </div>
+  `;
+
+  body.innerHTML = suggestionHtml + samplesHtml;
+}
+
+function closeRegexModal() {
+  document.getElementById('regex-modal').style.display = 'none';
+  regexModalRepoId = null;
+  regexModalResult = null;
+}
+
+function applyDetectedRegex() {
+  if (!regexModalRepoId || !regexModalResult) return;
+
+  const suggestionInput = document.getElementById('suggestion-regex-input');
+  const nicknameRegex = suggestionInput ? suggestionInput.value.trim() || null : null;
+
+  const cohortInputs = document.querySelectorAll('.cohort-regex-input');
+  const cohortRegexRules = [];
+  cohortInputs.forEach((input) => {
+    const cohortAttr = input.getAttribute('data-cohort');
+    if (!cohortAttr) return;
+    const cohort = parseInt(cohortAttr, 10);
+    const regex = input.value.trim();
+    if (!isNaN(cohort) && regex) {
+      cohortRegexRules.push({ cohort, nicknameRegex: regex });
+    }
+  });
+
+  const payload = {
+    nicknameRegex,
+    cohortRegexRules: cohortRegexRules.length > 0 ? cohortRegexRules : null,
+  };
+
+  fetch(`/admin/repos/${regexModalRepoId}`, {
+    method: 'PATCH',
+    headers: authHeaders('application/json'),
+    body: JSON.stringify(payload),
+  })
+    .then((response) => {
+      if (!response.ok) throw new Error('failed');
+      return response.json();
+    })
+    .then(() => {
+      toast('정규식 적용 완료');
+      closeRegexModal();
+      return loadRepos();
+    })
+    .catch(() => alert('정규식 적용에 실패했습니다.'));
 }
 
 document.getElementById('secret-input').addEventListener('keydown', (event) => {

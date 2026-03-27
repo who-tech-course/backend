@@ -185,6 +185,20 @@
 
     <div id="toast"></div>
 
+    <div id="regex-modal" class="modal-overlay" style="display:none">
+      <div class="modal">
+        <div class="modal-head">
+          <h3 id="regex-modal-title">정규식 자동 감지</h3>
+          <button onclick="closeRegexModal()">✕</button>
+        </div>
+        <div id="regex-modal-body"></div>
+        <div class="modal-foot">
+          <button class="btn-secondary" onclick="closeRegexModal()">닫기</button>
+          <button class="btn-primary" id="regex-apply-btn" onclick="applyDetectedRegex()">적용</button>
+        </div>
+      </div>
+    </div>
+
     <script src="/admin/ui/admin.js"></script>
   </body>
 </html>
