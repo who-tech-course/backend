@@ -148,6 +148,7 @@ export function createSyncService(deps: {
   const syncWorkspace = async (
     octokit: Octokit,
     workspaceId: number,
+    onProgress?: (step: { repo: string; done: number; total: number; synced: number }) => void,
   ): Promise<{ totalSynced: number; reposSynced: number }> => {
     const workspace = await workspaceRepo.findByIdOrThrow(workspaceId);
     const cohortRules: CohortRule[] = JSON.parse(workspace.cohortRules);
@@ -158,9 +159,11 @@ export function createSyncService(deps: {
     const activeRepos = repos.filter((r) => r.status === 'active' && r.syncMode === 'once' && r.lastSyncAt === null);
 
     let totalSynced = 0;
-    for (const repo of activeRepos) {
+    for (let i = 0; i < activeRepos.length; i++) {
+      const repo = activeRepos[i]!;
       const { synced } = await syncRepo(octokit, workspaceId, workspace.githubOrg, repo, workspaceRegex, cohortRules);
       totalSynced += synced;
+      onProgress?.({ repo: repo.name, done: i + 1, total: activeRepos.length, synced });
     }
 
     await workspaceRepo.touch(workspaceId);

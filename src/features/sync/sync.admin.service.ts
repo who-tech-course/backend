@@ -24,6 +24,13 @@ export function createSyncAdminService(deps: {
       const workspace = await workspaceService.getOrThrow();
       return syncService.syncWorkspace(octokit, workspace.id);
     },
+
+    syncAdminWorkspaceStream: async (
+      onProgress: (step: { repo: string; done: number; total: number; synced: number }) => void,
+    ) => {
+      const workspace = await workspaceService.getOrThrow();
+      return syncService.syncWorkspace(octokit, workspace.id, onProgress);
+    },
   };
 }
 

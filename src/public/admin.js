@@ -363,23 +363,57 @@ function syncRepo(id, button) {
 
 function triggerSync() {
   const button = document.getElementById('sync-btn');
+  const progressWrap = document.getElementById('sync-progress-wrap');
+  const progressBar = document.getElementById('sync-progress-bar');
+  const progressLabel = document.getElementById('sync-progress-label');
+
   button.disabled = true;
   button.textContent = '동기화 중...';
-  fetch('/admin/sync', { method: 'POST', headers: authHeaders() })
-    .then((response) => response.json())
-    .then((data) => {
-      document.getElementById('sync-result').textContent =
-        `완료: ${data.reposSynced}개 레포, ${data.totalSynced}건 수집됨`;
-      toast(`전체 sync 완료 (${data.totalSynced}건)`);
-      return Promise.all([loadStatus(), loadMembers()]);
-    })
-    .catch(() => {
-      document.getElementById('sync-result').textContent = '전체 sync 실패';
-    })
-    .finally(() => {
-      button.disabled = false;
-      button.textContent = '전체 Sync';
-    });
+  progressWrap.style.display = 'block';
+  progressBar.style.width = '0%';
+  progressLabel.textContent = '준비 중...';
+
+  const url = `/admin/sync/stream?token=${encodeURIComponent(token)}`;
+  const es = new EventSource(url);
+
+  es.addEventListener('progress', (e) => {
+    const { repo, done, total, synced } = JSON.parse(e.data);
+    const pct = Math.round((done / total) * 100);
+    progressBar.style.width = `${pct}%`;
+    progressLabel.textContent = `(${done}/${total}) ${repo} — ${synced}건`;
+    document.getElementById('sync-result').textContent = `진행 중: ${done}/${total} 레포`;
+  });
+
+  es.addEventListener('done', (e) => {
+    const { reposSynced, totalSynced } = JSON.parse(e.data);
+    progressBar.style.width = '100%';
+    progressLabel.textContent = `완료: ${reposSynced}개 레포, ${totalSynced}건 수집됨`;
+    document.getElementById('sync-result').textContent = `완료: ${reposSynced}개 레포, ${totalSynced}건 수집됨`;
+    toast(`전체 sync 완료 (${totalSynced}건)`);
+    es.close();
+    button.disabled = false;
+    button.textContent = '전체 Sync';
+    Promise.all([loadStatus(), loadMembers(), loadRepos()]);
+  });
+
+  es.addEventListener('error', (e) => {
+    const msg = e.data ? JSON.parse(e.data).message : 'sync 실패';
+    progressLabel.textContent = `오류: ${msg}`;
+    document.getElementById('sync-result').textContent = '전체 sync 실패';
+    toast('전체 sync 실패');
+    es.close();
+    button.disabled = false;
+    button.textContent = '전체 Sync';
+  });
+
+  es.onerror = () => {
+    if (es.readyState === EventSource.CLOSED) return;
+    progressLabel.textContent = '연결 오류';
+    document.getElementById('sync-result').textContent = '전체 sync 실패';
+    es.close();
+    button.disabled = false;
+    button.textContent = '전체 Sync';
+  };
 }
 
 function triggerTsAndLearningTest() {
