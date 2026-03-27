@@ -55,6 +55,7 @@ export function createRepoService(deps: {
       nicknameRegex?: string;
       cohortRegexRules?: CohortRegexRule[];
       cohorts?: number[];
+      level?: number | null;
       order?: number;
     }) => {
       const workspace = await workspaceService.getOrThrow();
@@ -71,6 +72,7 @@ export function createRepoService(deps: {
         nicknameRegex: input.nicknameRegex ?? null,
         cohortRegexRules: stringifyCohortRegexRules(input.cohortRegexRules),
         ...(input.cohorts?.length ? { cohorts: JSON.stringify(input.cohorts) } : {}),
+        ...(input.level !== undefined ? { level: input.level } : {}),
         ...(input.order !== undefined ? { order: input.order } : {}),
         workspaceId: workspace.id,
       });
@@ -89,6 +91,7 @@ export function createRepoService(deps: {
         nicknameRegex?: string | null;
         cohortRegexRules?: CohortRegexRule[] | null;
         cohorts?: number[] | null;
+        level?: number | null;
         order?: number;
       },
     ) => {
@@ -106,6 +109,7 @@ export function createRepoService(deps: {
         ...(input.cohorts !== undefined
           ? { cohorts: input.cohorts === null ? null : JSON.stringify(input.cohorts) }
           : {}),
+        ...(input.level !== undefined ? { level: input.level } : {}),
         ...(input.order !== undefined ? { order: input.order } : {}),
       });
       return toResponse(repo);

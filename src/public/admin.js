@@ -137,7 +137,7 @@ function repoRow(repo) {
       <td>
         <div class="stack">
           <span>${repo.track == null ? '공통' : repo.track}</span>
-          <span class="muted">${repo.type}</span>
+          <span class="muted">${repo.type}${repo.level != null ? ` · 레벨${repo.level}` : ''}</span>
         </div>
       </td>
       <td>${cohortsHtml}</td>
@@ -307,6 +307,9 @@ function editRepo(id) {
   const cohortsInput = prompt('기수 (쉼표로 구분, 예: 7,8)', repo.cohorts?.join(', ') ?? '');
   if (cohortsInput === null) return;
   const cohorts = cohortsInput ? cohortsInput.split(',').map((c) => Number(c.trim())).filter((n) => !isNaN(n)) : null;
+  const levelInput = prompt('레벨 (1/2/3/4, 없으면 빈칸)', repo.level != null ? String(repo.level) : '');
+  if (levelInput === null) return;
+  const level = levelInput.trim() ? Number(levelInput.trim()) : null;
   const nicknameRegex = prompt('기본 닉네임 정규식', repo.nicknameRegex ?? '');
   if (nicknameRegex === null) return;
   const cohortRegexRules = prompt(
@@ -324,6 +327,7 @@ function editRepo(id) {
       type,
       description: description || null,
       cohorts,
+      level,
       nicknameRegex: nicknameRegex || null,
       cohortRegexRules: parseJsonOrNull(cohortRegexRules),
     }),

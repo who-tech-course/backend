@@ -65,6 +65,7 @@ export function parseRepoCreateInput(body: unknown): {
   nicknameRegex?: string;
   cohortRegexRules?: CohortRegexRule[];
   cohorts?: number[];
+  level?: number | null;
   order?: number;
 } {
   if (!isRecord(body)) {
@@ -84,6 +85,7 @@ export function parseRepoCreateInput(body: unknown): {
     nicknameRegex,
     cohortRegexRules,
     cohorts,
+    level,
     order,
   } = body;
 
@@ -131,6 +133,10 @@ export function parseRepoCreateInput(body: unknown): {
     badRequest('invalid cohorts');
   }
 
+  if (level !== undefined && level !== null && typeof level !== 'number') {
+    badRequest('invalid level');
+  }
+
   if (order !== undefined && typeof order !== 'number') {
     badRequest('invalid order');
   }
@@ -148,6 +154,7 @@ export function parseRepoCreateInput(body: unknown): {
     ...(nicknameRegex !== undefined ? { nicknameRegex } : {}),
     ...(cohortRegexRules !== undefined ? { cohortRegexRules } : {}),
     ...(cohorts !== undefined ? { cohorts } : {}),
+    ...(level !== undefined ? { level } : {}),
     ...(order !== undefined ? { order } : {}),
   };
 }
@@ -162,6 +169,7 @@ export function parseRepoUpdateInput(body: unknown): {
   nicknameRegex?: string | null;
   cohortRegexRules?: CohortRegexRule[] | null;
   cohorts?: number[] | null;
+  level?: number | null;
   order?: number;
 } {
   if (!isRecord(body)) {
@@ -178,6 +186,7 @@ export function parseRepoUpdateInput(body: unknown): {
     nicknameRegex,
     cohortRegexRules,
     cohorts,
+    level,
     order,
   } = body;
 
@@ -217,6 +226,10 @@ export function parseRepoUpdateInput(body: unknown): {
     badRequest('invalid cohorts');
   }
 
+  if (level !== undefined && level !== null && typeof level !== 'number') {
+    badRequest('invalid level');
+  }
+
   if (order !== undefined && typeof order !== 'number') {
     badRequest('invalid order');
   }
@@ -231,6 +244,7 @@ export function parseRepoUpdateInput(body: unknown): {
     ...(nicknameRegex !== undefined ? { nicknameRegex } : {}),
     ...(cohortRegexRules !== undefined ? { cohortRegexRules } : {}),
     ...(cohorts !== undefined ? { cohorts } : {}),
+    ...(level !== undefined ? { level } : {}),
     ...(order !== undefined ? { order } : {}),
   };
 }

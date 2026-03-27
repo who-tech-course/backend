@@ -53,7 +53,8 @@ model MissionRepo {
   nicknameRegex String?      // null이면 Workspace.nicknameRegex fallback
   cohortRegexRules String?   // JSON: [{"cohort": 7, "nicknameRegex": "..."}, ...]
   cohorts       String?      // JSON: [7, 8] — 이 레포가 해당하는 기수 목록
-  order         Int          @default(0)   // 관리자 정렬 순서
+  level         Int?         // 1 | 2 | 3 | 4 — 레벨 (null이면 미분류)
+  order         Int          @default(0)   // 레벨 내 정렬 순서
   syncMode      String       @default("continuous") // continuous | once
   lastSyncAt    DateTime?
   workspaceId   Int
