@@ -269,7 +269,7 @@ function repoRow(repo) {
         </div>
       </td>
       <td>
-        <div class="stack">
+        <div class="stack repo-status-stack">
           <span class="pill ${repo.status} editable" onclick="inlineEditStatus(this, ${repo.id})">${repo.status}</span>
           <span class="editable muted small" onclick="inlineEditSyncMode(this, ${repo.id})">${repo.syncMode === 'once' ? '1회' : '계속'}</span>
         </div>

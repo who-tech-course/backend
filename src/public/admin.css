@@ -110,6 +110,7 @@ tr:last-child td { border-bottom: none; }
 .muted { color: #64748b; font-size: 11px; line-height: 1.4; }
 .mono { font-family: ui-monospace, monospace; white-space: pre-wrap; word-break: break-word; }
 .stack { display: flex; flex-direction: column; gap: 4px; }
+.repo-status-stack { align-items: center; text-align: center; }
 .post-list { display: flex; flex-direction: column; gap: 6px; min-width: 240px; }
 .pr-list { display: flex; flex-direction: column; gap: 6px; min-width: 260px; margin-top: 6px; }
 .post-item a, .link { color: #0369a1; text-decoration: none; word-break: break-all; }
