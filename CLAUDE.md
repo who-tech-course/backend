@@ -86,6 +86,9 @@ DELETE /admin/members                 — 전체 멤버 + submissions + blogPost
 DELETE /admin/members/:id             — 멤버 + submissions + blogPosts 삭제
 POST /admin/blog/sync                 — 블로그 RSS 전체 sync (blogSyncEnabled 체크)
 POST /admin/blog/backfill             — GitHub profile blog 백필 (?limit=30&cohort= 기수 필터)
+GET  /admin/logs                      — 어드민 활동 로그 조회 (최근 200개)
+POST /admin/logs                      — 로그 기록 (type, message)
+DELETE /admin/logs                    — 전체 로그 삭제
 ```
 
 모든 `/admin` 엔드포인트는 `Authorization: Bearer <ADMIN_SECRET>` 필요.
