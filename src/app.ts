@@ -11,6 +11,7 @@ import { createMemberRepository } from './db/repositories/member.repository.js';
 import { createMissionRepoRepository } from './db/repositories/mission-repo.repository.js';
 import { createSubmissionRepository } from './db/repositories/submission.repository.js';
 import { createBlogPostRepository } from './db/repositories/blog-post.repository.js';
+import { createCohortRepoRepository } from './db/repositories/cohort-repo.repository.js';
 
 // Services
 import { createWorkspaceService } from './features/workspace/workspace.service.js';
@@ -20,6 +21,7 @@ import { createSyncAdminService } from './features/sync/sync.admin.service.js';
 import { createRepoService } from './features/repo/repo.service.js';
 import { createBlogService } from './features/blog/blog.service.js';
 import { createBlogAdminService } from './features/blog/blog.admin.service.js';
+import { createCohortRepoService } from './features/cohort-repo/cohort-repo.service.js';
 import { createOctokit } from './features/sync/github.service.js';
 
 // Routers
@@ -28,6 +30,7 @@ import { createMemberRouter } from './features/member/member.route.js';
 import { createRepoRouter } from './features/repo/repo.route.js';
 import { createSyncRouter } from './features/sync/sync.route.js';
 import { createBlogRouter } from './features/blog/blog.route.js';
+import { createCohortRepoRouter } from './features/cohort-repo/cohort-repo.route.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -40,12 +43,14 @@ const memberRepo = createMemberRepository(db);
 const missionRepoRepo = createMissionRepoRepository(db);
 const submissionRepo = createSubmissionRepository(db);
 const blogPostRepo = createBlogPostRepository(db);
+const cohortRepoRepo = createCohortRepoRepository(db);
 
 const workspaceService = createWorkspaceService({ workspaceRepo });
 const syncService = createSyncService({ memberRepo, missionRepoRepo, submissionRepo, workspaceRepo });
 const memberService = createMemberService({ memberRepo, blogPostRepo, workspaceService });
 const repoService = createRepoService({ missionRepoRepo, workspaceService, syncService, octokit });
 const blogService = createBlogService({ memberRepo, blogPostRepo });
+const cohortRepoService = createCohortRepoService({ cohortRepoRepo, missionRepoRepo, workspaceService });
 const blogAdminService = createBlogAdminService({ memberRepo, workspaceService, blogService, octokit });
 const syncAdminService = createSyncAdminService({
   memberRepo,
@@ -70,6 +75,7 @@ app.use('/admin/repos', createRepoRouter(repoService));
 app.use('/admin', createSyncRouter(syncAdminService));
 app.use('/admin', createBlogRouter(blogAdminService));
 app.use('/admin/members', createMemberRouter(memberService));
+app.use('/admin/cohort-repos', createCohortRepoRouter(cohortRepoService));
 app.use(errorHandler);
 
 export default app;

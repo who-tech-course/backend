@@ -69,6 +69,7 @@
           </div>
           <div class="actions">
             <button class="btn-danger" onclick="deleteAllRepos()">전체 삭제</button>
+            <button class="btn-secondary" id="detect-regex-all-btn" onclick="detectRegexAll()">정규식 자동감지+적용</button>
             <button class="btn-secondary" id="validate-regex-btn" onclick="startValidateAllRegex()">정규식 검증</button>
             <button class="btn-primary" id="discover-btn" onclick="discoverRepos()">후보 불러오기</button>
           </div>
@@ -241,6 +242,46 @@
       </div>
 
       <div class="card" style="margin-top: 16px">
+        <div class="section-head">
+          <div>
+            <h2>기수별 레포 순서</h2>
+            <div class="sub">기수별로 레포를 추가하고 순서를 관리합니다. 아카이브 페이지 생성에 사용됩니다.</div>
+          </div>
+        </div>
+        <div class="toolbar">
+          <select id="cohort-repo-cohort" onchange="loadCohortRepos()">
+            <option value="">기수 선택</option>
+            <option value="8">8기</option>
+            <option value="7">7기</option>
+            <option value="6">6기</option>
+            <option value="5">5기</option>
+          </select>
+          <button class="btn-secondary" onclick="autoFillCohortRepos()">자동 채우기</button>
+        </div>
+        <div class="table-wrap" style="margin-bottom:12px">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:48px">순서</th>
+                <th>레포</th>
+                <th style="width:72px">트랙</th>
+                <th style="width:72px">레벨</th>
+                <th style="width:140px">작업</th>
+              </tr>
+            </thead>
+            <tbody id="cohort-repo-table-body"></tbody>
+          </table>
+        </div>
+        <div class="form-inline">
+          <select id="cohort-repo-select" style="flex:1">
+            <option value="">레포 선택</option>
+          </select>
+          <input type="number" id="cohort-repo-order" placeholder="순서" min="0" style="width:80px" />
+          <button class="btn-primary" onclick="addCohortRepo()">추가</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 16px">
         <h2>Workspace 설정</h2>
         <div class="stack">
           <input type="text" id="nickname-regex" placeholder="기본 닉네임 정규식" />
@@ -294,5 +335,6 @@
     </div>
 
     <script src="/admin/ui/admin.js"></script>
+    <script>tryAutoLogin();</script>
   </body>
 </html>

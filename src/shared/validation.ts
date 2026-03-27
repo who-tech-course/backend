@@ -66,7 +66,6 @@ export function parseRepoCreateInput(body: unknown): {
   cohortRegexRules?: CohortRegexRule[];
   cohorts?: number[];
   level?: number | null;
-  order?: number;
 } {
   if (!isRecord(body)) {
     badRequest('invalid body');
@@ -86,7 +85,6 @@ export function parseRepoCreateInput(body: unknown): {
     cohortRegexRules,
     cohorts,
     level,
-    order,
   } = body;
 
   if (githubRepoId !== undefined && typeof githubRepoId !== 'number') {
@@ -137,10 +135,6 @@ export function parseRepoCreateInput(body: unknown): {
     badRequest('invalid level');
   }
 
-  if (order !== undefined && typeof order !== 'number') {
-    badRequest('invalid order');
-  }
-
   return {
     ...(githubRepoId !== undefined ? { githubRepoId } : {}),
     name,
@@ -155,7 +149,6 @@ export function parseRepoCreateInput(body: unknown): {
     ...(cohortRegexRules !== undefined ? { cohortRegexRules } : {}),
     ...(cohorts !== undefined ? { cohorts } : {}),
     ...(level !== undefined ? { level } : {}),
-    ...(order !== undefined ? { order } : {}),
   };
 }
 
@@ -170,7 +163,6 @@ export function parseRepoUpdateInput(body: unknown): {
   cohortRegexRules?: CohortRegexRule[] | null;
   cohorts?: number[] | null;
   level?: number | null;
-  order?: number;
 } {
   if (!isRecord(body)) {
     badRequest('invalid body');
@@ -187,7 +179,6 @@ export function parseRepoUpdateInput(body: unknown): {
     cohortRegexRules,
     cohorts,
     level,
-    order,
   } = body;
 
   if (description !== undefined && description !== null && typeof description !== 'string') {
@@ -230,10 +221,6 @@ export function parseRepoUpdateInput(body: unknown): {
     badRequest('invalid level');
   }
 
-  if (order !== undefined && typeof order !== 'number') {
-    badRequest('invalid order');
-  }
-
   return {
     ...(description !== undefined ? { description } : {}),
     ...(track !== undefined ? { track } : {}),
@@ -245,7 +232,6 @@ export function parseRepoUpdateInput(body: unknown): {
     ...(cohortRegexRules !== undefined ? { cohortRegexRules } : {}),
     ...(cohorts !== undefined ? { cohorts } : {}),
     ...(level !== undefined ? { level } : {}),
-    ...(order !== undefined ? { order } : {}),
   };
 }
 

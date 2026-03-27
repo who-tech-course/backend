@@ -16,6 +16,7 @@ model Workspace {
   blogSyncEnabled Boolean       @default(true)
   members         Member[]
   missionRepos    MissionRepo[]
+  cohortRepos     CohortRepo[]
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 }
@@ -52,16 +53,28 @@ model MissionRepo {
   candidateReason String?
   nicknameRegex String?      // null이면 Workspace.nicknameRegex fallback
   cohortRegexRules String?   // JSON: [{"cohort": 7, "nicknameRegex": "..."}, ...]
-  cohorts       String?      // JSON: [7, 8] — 이 레포가 해당하는 기수 목록
+  cohorts       String?      // JSON: [7, 8] — sync 기수 필터용
   level         Int?         // 1 | 2 | 3 | 4 — 레벨 (null이면 미분류)
-  order         Int          @default(0)   // 레벨 내 정렬 순서
   syncMode      String       @default("continuous") // continuous | once
   lastSyncAt    DateTime?
   workspaceId   Int
   workspace     Workspace    @relation(fields: [workspaceId], references: [id])
   submissions   Submission[]
+  cohortRepos   CohortRepo[]
 
   @@unique([name, workspaceId])
+}
+
+model CohortRepo {
+  id            Int         @id @default(autoincrement())
+  cohort        Int
+  order         Int         @default(0)
+  missionRepoId Int
+  missionRepo   MissionRepo @relation(fields: [missionRepoId], references: [id], onDelete: Cascade)
+  workspaceId   Int
+  workspace     Workspace   @relation(fields: [workspaceId], references: [id])
+
+  @@unique([cohort, missionRepoId])
 }
 
 model Submission {

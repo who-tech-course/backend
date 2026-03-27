@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-let token = '';
+let token = localStorage.getItem('admin_token') ?? '';
 let repoList = [];
 let memberList = [];
 let memberSearchTimer = null;
@@ -19,15 +19,25 @@ function login() {
   token = document.getElementById('secret-input').value;
   fetch('/admin/status', { headers: authHeaders() })
     .then((response) => {
-      if (!response.ok) {
-        throw new Error('unauthorized');
-      }
-
+      if (!response.ok) throw new Error('unauthorized');
+      localStorage.setItem('admin_token', token);
       document.getElementById('login').style.display = 'none';
       document.getElementById('main').style.display = 'block';
       return Promise.all([loadStatus(), loadWorkspace(), loadRepos(), loadMembers()]);
     })
     .catch(() => alert('잘못된 비밀키입니다.'));
+}
+
+function tryAutoLogin() {
+  if (!token) return;
+  fetch('/admin/status', { headers: authHeaders() })
+    .then((response) => {
+      if (!response.ok) { localStorage.removeItem('admin_token'); return; }
+      document.getElementById('login').style.display = 'none';
+      document.getElementById('main').style.display = 'block';
+      return Promise.all([loadStatus(), loadWorkspace(), loadRepos(), loadMembers()]);
+    })
+    .catch(() => { localStorage.removeItem('admin_token'); });
 }
 
 function authHeaders(contentType) {
@@ -110,6 +120,7 @@ function loadRepos() {
     .then((repos) => {
       repoList = repos;
       renderRepos();
+      populateCohortRepoSelect();
     });
 }
 
@@ -158,7 +169,6 @@ function repoRow(repo) {
       <td class="muted small">${syncedAt}</td>
       <td>
         <div class="actions">
-          <input type="number" class="order-input" value="${repo.order ?? 0}" onchange="setRepoOrder(${repo.id}, this.value)" title="순서" />
           <button class="btn-sm btn-secondary" onclick="syncRepo(${repo.id}, this)">Sync</button>
           <button class="btn-sm btn-ghost" onclick="detectRepoRegex(${repo.id})">감지</button>
           <button class="btn-sm btn-ghost" onclick="editRepo(${repo.id})">수정</button>
@@ -396,17 +406,6 @@ function deleteRepo(id) {
     .catch(() => alert('레포 삭제에 실패했습니다.'));
 }
 
-function setRepoOrder(id, value) {
-  const order = Number(value);
-  if (isNaN(order)) return;
-  fetch(`/admin/repos/${id}`, {
-    method: 'PATCH',
-    headers: authHeaders('application/json'),
-    body: JSON.stringify({ order }),
-  })
-    .then(() => loadRepos())
-    .catch(() => alert('순서 변경에 실패했습니다.'));
-}
 
 function syncRepo(id, button) {
   button.disabled = true;
@@ -935,6 +934,26 @@ function closeRegexModal() {
   regexModalResult = null;
 }
 
+async function detectRegexAll() {
+  const btn = document.getElementById('detect-regex-all-btn');
+  btn.disabled = true;
+  btn.textContent = '감지 중...';
+  try {
+    const res = await fetch('/admin/repos/detect-regex-all', { method: 'POST', headers: authHeaders() });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const results = await res.json();
+    const applied = results.filter((r) => !r.skipped);
+    const skipped = results.filter((r) => r.skipped);
+    toast(`정규식 적용 완료: ${applied.length}개 / 스킵 ${skipped.length}개`);
+    await loadRepos();
+  } catch (e) {
+    alert(`정규식 자동감지 실패: ${e}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '정규식 자동감지+적용';
+  }
+}
+
 function closeValidateModal() {
   document.getElementById('validate-regex-modal').style.display = 'none';
 }
@@ -1082,3 +1101,100 @@ document.getElementById('secret-input').addEventListener('keydown', (event) => {
     login();
   }
 });
+
+// ── 기수별 레포 관리 ──────────────────────────────────────────────
+let cohortRepoList = [];
+let cohortRepoSelectedCohort = null;
+
+function loadCohortRepos() {
+  const cohort = Number(document.getElementById('cohort-repo-cohort').value);
+  if (!cohort) { document.getElementById('cohort-repo-table-body').innerHTML = ''; return; }
+  cohortRepoSelectedCohort = cohort;
+  fetch(`/admin/cohort-repos?cohort=${cohort}`, { headers: authHeaders() })
+    .then((r) => r.json())
+    .then((data) => {
+      cohortRepoList = data;
+      renderCohortRepos();
+    })
+    .catch(() => toast('기수 레포 목록 불러오기 실패'));
+}
+
+function renderCohortRepos() {
+  const tbody = document.getElementById('cohort-repo-table-body');
+  if (!cohortRepoList.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="muted" style="text-align:center;padding:16px">추가된 레포 없음</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = cohortRepoList.map((entry) => `
+    <tr>
+      <td class="muted small">${entry.order}</td>
+      <td><strong>${escapeHtml(entry.missionRepo.name)}</strong></td>
+      <td class="muted small">${entry.missionRepo.track ?? '공통'}</td>
+      <td class="muted small">${entry.missionRepo.level != null ? `레벨${entry.missionRepo.level}` : '-'}</td>
+      <td>
+        <div class="actions">
+          <input type="number" class="order-input" value="${entry.order}" onchange="setCohortRepoOrder(${entry.id}, this.value)" title="순서" style="width:52px" />
+          <button class="btn-sm btn-danger" onclick="deleteCohortRepo(${entry.id})">삭제</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function addCohortRepo() {
+  const cohort = cohortRepoSelectedCohort;
+  if (!cohort) { alert('기수를 먼저 선택하세요.'); return; }
+  const select = document.getElementById('cohort-repo-select');
+  const missionRepoId = Number(select.value);
+  if (!missionRepoId) { alert('레포를 선택하세요.'); return; }
+  const order = Number(document.getElementById('cohort-repo-order').value) || 0;
+
+  fetch('/admin/cohort-repos', {
+    method: 'POST',
+    headers: authHeaders('application/json'),
+    body: JSON.stringify({ cohort, missionRepoId, order }),
+  })
+    .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
+    .then(() => { toast('레포 추가됨'); loadCohortRepos(); })
+    .catch(() => alert('추가 실패 (중복일 수 있음)'));
+}
+
+function setCohortRepoOrder(id, value) {
+  const order = Number(value);
+  if (isNaN(order)) return;
+  fetch(`/admin/cohort-repos/${id}`, {
+    method: 'PATCH',
+    headers: authHeaders('application/json'),
+    body: JSON.stringify({ order }),
+  })
+    .then(() => loadCohortRepos())
+    .catch(() => alert('순서 변경 실패'));
+}
+
+function deleteCohortRepo(id) {
+  if (!confirm('이 레포를 기수 목록에서 제거하시겠습니까?')) return;
+  fetch(`/admin/cohort-repos/${id}`, { method: 'DELETE', headers: authHeaders() })
+    .then(() => { toast('제거됨'); loadCohortRepos(); })
+    .catch(() => alert('삭제 실패'));
+}
+
+function autoFillCohortRepos() {
+  const cohort = cohortRepoSelectedCohort ?? Number(document.getElementById('cohort-repo-cohort').value);
+  if (!cohort) { alert('기수를 먼저 선택하세요.'); return; }
+  fetch('/admin/cohort-repos/auto-fill', {
+    method: 'POST',
+    headers: authHeaders('application/json'),
+    body: JSON.stringify({ cohort }),
+  })
+    .then((r) => r.json())
+    .then((data) => { toast(`${data.added}개 레포 자동 추가됨`); loadCohortRepos(); })
+    .catch(() => alert('자동 채우기 실패'));
+}
+
+function populateCohortRepoSelect() {
+  const select = document.getElementById('cohort-repo-select');
+  select.innerHTML = '<option value="">레포 선택</option>' +
+    repoList
+      .map((r) => `<option value="${r.id}">[${r.status}] ${escapeHtml(r.name)}${r.level != null ? ` (레벨${r.level})` : ''}</option>`)
+      .join('');
+}

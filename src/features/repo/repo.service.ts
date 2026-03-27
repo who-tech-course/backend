@@ -40,7 +40,6 @@ export function createRepoService(deps: {
     listRepos: async (status?: string) => {
       const workspace = await workspaceService.getOrThrow();
       const repos = await missionRepoRepo.findMany({ workspaceId: workspace.id, ...(status ? { status } : {}) }, [
-        { order: 'asc' },
         { name: 'asc' },
       ]);
       return repos.map(toResponse);
@@ -60,7 +59,6 @@ export function createRepoService(deps: {
       cohortRegexRules?: CohortRegexRule[];
       cohorts?: number[];
       level?: number | null;
-      order?: number;
     }) => {
       const workspace = await workspaceService.getOrThrow();
       const repo = await missionRepoRepo.create({
@@ -77,7 +75,6 @@ export function createRepoService(deps: {
         cohortRegexRules: stringifyCohortRegexRules(input.cohortRegexRules),
         ...(input.cohorts?.length ? { cohorts: JSON.stringify(input.cohorts) } : {}),
         ...(input.level !== undefined ? { level: input.level } : {}),
-        ...(input.order !== undefined ? { order: input.order } : {}),
         workspaceId: workspace.id,
       });
       return toResponse(repo);
@@ -96,7 +93,6 @@ export function createRepoService(deps: {
         cohortRegexRules?: CohortRegexRule[] | null;
         cohorts?: number[] | null;
         level?: number | null;
-        order?: number;
       },
     ) => {
       const repo = await missionRepoRepo.update(id, {
@@ -114,7 +110,6 @@ export function createRepoService(deps: {
           ? { cohorts: input.cohorts === null ? null : JSON.stringify(input.cohorts) }
           : {}),
         ...(input.level !== undefined ? { level: input.level } : {}),
-        ...(input.order !== undefined ? { order: input.order } : {}),
       });
       return toResponse(repo);
     },
@@ -262,6 +257,61 @@ export function createRepoService(deps: {
         cohortRegexRules: parseCohortRegexRules(repo.cohortRegexRules),
         samples,
       };
+    },
+
+    detectAndApplyAllRegex: async (): Promise<
+      { id: number; name: string; applied: string | null; cohortRegexRules: CohortRegexRule[]; skipped?: boolean }[]
+    > => {
+      const workspace = await workspaceService.getOrThrow();
+      const cohortRules = JSON.parse(workspace.cohortRules) as CohortRule[];
+      const repos = await missionRepoRepo.findMany({ workspaceId: workspace.id, status: 'active' });
+      const results = [];
+
+      for (const repo of repos) {
+        const prs = await fetchRepoPRs(octokit, workspace.githubOrg, repo.name, { maxPages: 1 });
+        if (prs.length === 0) {
+          results.push({ id: repo.id, name: repo.name, applied: null, cohortRegexRules: [], skipped: true });
+          continue;
+        }
+
+        const cohortMap = new Map<number | null, string[]>();
+        for (const pr of prs) {
+          const cohort = detectCohort(new Date(pr.created_at), cohortRules);
+          const titles = cohortMap.get(cohort) ?? [];
+          titles.push(pr.title);
+          cohortMap.set(cohort, titles);
+        }
+
+        const perCohort = [...cohortMap.entries()].map(([cohort, titles]) => ({
+          cohort,
+          detectedRegex: detectRegexFromTitles(titles.slice(0, 5)),
+        }));
+
+        const regexValues = perCohort.map((c) => c.detectedRegex).filter((r): r is string => r !== null);
+        const allSame = regexValues.length > 0 && regexValues.every((r) => r === regexValues[0]);
+
+        let nicknameRegex: string | null = null;
+        let cohortRegexRules: CohortRegexRule[] = [];
+
+        if (allSame) {
+          nicknameRegex = regexValues[0]!;
+        } else {
+          cohortRegexRules = perCohort
+            .filter(
+              (c): c is { cohort: number; detectedRegex: string } => c.cohort !== null && c.detectedRegex !== null,
+            )
+            .map((c) => ({ cohort: c.cohort, nicknameRegex: c.detectedRegex }));
+        }
+
+        await missionRepoRepo.update(repo.id, {
+          nicknameRegex,
+          cohortRegexRules: stringifyCohortRegexRules(cohortRegexRules.length ? cohortRegexRules : null),
+        });
+
+        results.push({ id: repo.id, name: repo.name, applied: nicknameRegex, cohortRegexRules });
+      }
+
+      return results;
     },
 
     deleteRepo: (id: number) => missionRepoRepo.deleteWithSubmissions(id),
