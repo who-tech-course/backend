@@ -41,7 +41,9 @@ src/
 │   ├── constants.ts
 │   └── types/
 └── public/
-    └── admin.html                # 어드민 UI (단일 파일)
+    ├── admin.html                # 어드민 UI 마크업
+    ├── admin.css                 # 어드민 스타일
+    └── admin.js                  # 어드민 동작 로직
 ```
 
 ### 의존성 주입 구조
@@ -66,18 +68,38 @@ app.ts (composition root)
 
 ```bash
 npm install
+npx prisma generate
+node --import tsx src/db/seed.ts
 npm run dev       # tsx watch로 핫리로드
 ```
 
+### DB / Migration
+
+- 현재 Prisma migration은 baseline 1개로 관리합니다.
+  - [`prisma/migrations/20260328190000_baseline/migration.sql`](/Users/iftype/Projects/Side/who-tech-course/backend/prisma/migrations/20260328190000_baseline/migration.sql)
+- 로컬 DB를 새로 만들 때는 아래 순서를 권장합니다.
+
+```bash
+rm -f prisma/dev.db prisma/prisma/dev.db
+npx prisma db execute --schema prisma/schema.prisma --file prisma/migrations/20260328190000_baseline/migration.sql
+node --import tsx src/db/seed.ts
+```
+
+- `seed`는 `workspace`만 생성합니다.
+- 미션 레포는 어드민의 `후보 불러오기`로 다시 수집합니다.
+
 ## 스크립트
 
-| 명령어             | 설명                  |
-| ------------------ | --------------------- |
-| `npm run dev`      | 개발 서버 (tsx watch) |
-| `npm run build`    | TypeScript 빌드       |
-| `npm run lint`     | ESLint 검사           |
-| `npm run lint:fix` | ESLint 자동 수정      |
-| `npm run format`   | Prettier 포맷         |
+| 명령어              | 설명                  |
+| ------------------- | --------------------- |
+| `npm run dev`       | 개발 서버 (tsx watch) |
+| `npm run build`     | TypeScript 빌드       |
+| `npm run start`     | 빌드 결과 실행        |
+| `npm run lint`      | ESLint 검사           |
+| `npm run lint:fix`  | ESLint 자동 수정      |
+| `npm run format`    | Prettier 포맷         |
+| `npm run test:unit` | 단위 테스트           |
+| `npm run seed`      | workspace seed        |
 
 ## 코드 컨벤션
 
@@ -117,20 +139,15 @@ chore/설명
 ## 서버 배포
 
 - **서버**: Oracle Cloud AMD (iftype.store)
-- **프로세스 관리**: PM2 (tsx로 TS 직접 실행)
+- **프로세스 관리**: PM2
 - **웹서버**: Nginx (HTTPS, Rate limiting, 보안 헤더)
 
 ### 수동 배포
 
 ```bash
-rsync -av --exclude='node_modules' --exclude='dist' --exclude='.git' \
-  -e "ssh -i ~/.ssh/ssh-key-oracle.key" \
-  ./ ubuntu@168.107.51.150:~/app/backend/
-
-ssh oracle "cd ~/app/backend && npm install --ignore-scripts && pm2 restart backend"
+git push origin develop
+ssh oracle "cd ~/app/backend && git pull --ff-only origin develop && npm run build && pm2 restart backend --update-env"
 ```
-
-> `--ignore-scripts` 필수: 서버에 .git이 없어 husky가 실패함
 
 ### PM2 명령어
 
@@ -142,14 +159,28 @@ ssh oracle "pm2 restart backend" # 재시작
 
 ## 어드민 주요 기능
 
-| 기능           | 설명                                                                            |
-| -------------- | ------------------------------------------------------------------------------- |
-| 레포 후보 수집 | 조직 공개 레포 탐색 → once candidate 생성 (precourse 제외)                      |
-| 레포 관리      | 기수(cohorts), 레벨(level), 순서(order), 트랙, 정규식 관리, 페이지네이션        |
-| 정규식 검증    | 전체 active 레포 정규식을 최근 PR에 적용, 미매칭 레포 목록 + 수정/감지/건너뛰기 |
-| 전체 Sync      | once+미수집 레포 대상, SSE 진행률 표시                                          |
-| 블로그 동기화  | ON/OFF 토글, 다음 정각까지 카운트다운, 30일/7일 이중 보관                       |
-| 멤버 관리      | 수동 추가/전체 삭제, 역할 배열(crew/coach/reviewer), 블로그 글 팝업, 기본값 8기 |
+| 기능                 | 설명                                                                |
+| -------------------- | ------------------------------------------------------------------- |
+| 레포 후보 수집       | 조직 공개 레포 전체를 읽어 `candidate / excluded`로 저장            |
+| 레포 탭 관리         | `기준 / 공통 / 제외 / 프리코스` 탭으로 분류하고 행 단위로 이동 가능 |
+| 레포 설정            | 기수(cohorts), 레벨(level), 트랙, syncMode, 정규식, 탭 분류 관리    |
+| 정규식 자동감지/검증 | PR 제목 샘플 기반 정규식 제안, active 레포 검증                     |
+| 전체 / 단건 Sync     | SSE 진행률 표시, 레포별 수동 sync 지원                              |
+| 블로그 동기화        | ON/OFF 토글, RSS 상태 저장, 최근 글 30일 보관 + 최신 7일 스냅샷     |
+| 멤버 관리            | 역할 토글, manual nickname, 블로그, RSS 상태, 프로필 이미지 표시    |
+
+## 현재 데이터 모델 포인트
+
+- `MissionRepo.tabCategory`
+  - `base | common | excluded | precourse`
+- `MissionRepo.status`
+  - `active | candidate | excluded`
+- `Member.avatarUrl`
+  - GitHub profile의 `avatar_url` 문자열 저장
+- `Member.rssStatus`
+  - `unknown | available | unavailable | error`
+
+프로필 이미지는 이미지 파일을 저장하지 않고 GitHub avatar URL만 저장합니다.
 
 ## 버전 로드맵
 
