@@ -151,8 +151,7 @@ function repoRow(repo) {
       <td class="muted small">${syncedAt}</td>
       <td>
         <div class="actions">
-          <button class="btn-sm btn-ghost" onclick="moveRepo(${repo.id}, 'up')" title="위로">↑</button>
-          <button class="btn-sm btn-ghost" onclick="moveRepo(${repo.id}, 'down')" title="아래로">↓</button>
+          <input type="number" class="order-input" value="${repo.order ?? 0}" onchange="setRepoOrder(${repo.id}, this.value)" title="순서" />
           <button class="btn-sm btn-secondary" onclick="syncRepo(${repo.id}, this)">Sync</button>
           <button class="btn-sm btn-ghost" onclick="detectRepoRegex(${repo.id})">감지</button>
           <button class="btn-sm btn-ghost" onclick="editRepo(${repo.id})">수정</button>
@@ -358,32 +357,14 @@ function deleteRepo(id) {
     .catch(() => alert('레포 삭제에 실패했습니다.'));
 }
 
-function moveRepo(id, direction) {
-  const sorted = [...repoList].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name));
-  const repo = sorted.find((r) => r.id === id);
-  if (!repo) return;
-
-  const section = sorted.filter((r) => r.syncMode === repo.syncMode);
-  const idx = section.findIndex((r) => r.id === id);
-  const neighborIdx = direction === 'up' ? idx - 1 : idx + 1;
-  if (neighborIdx < 0 || neighborIdx >= section.length) return;
-
-  const neighbor = section[neighborIdx];
-  const myOrder = repo.order ?? 0;
-  const neighborOrder = neighbor.order ?? 0;
-
-  Promise.all([
-    fetch(`/admin/repos/${id}`, {
-      method: 'PATCH',
-      headers: authHeaders('application/json'),
-      body: JSON.stringify({ order: neighborOrder }),
-    }),
-    fetch(`/admin/repos/${neighbor.id}`, {
-      method: 'PATCH',
-      headers: authHeaders('application/json'),
-      body: JSON.stringify({ order: myOrder }),
-    }),
-  ])
+function setRepoOrder(id, value) {
+  const order = Number(value);
+  if (isNaN(order)) return;
+  fetch(`/admin/repos/${id}`, {
+    method: 'PATCH',
+    headers: authHeaders('application/json'),
+    body: JSON.stringify({ order }),
+  })
     .then(() => loadRepos())
     .catch(() => alert('순서 변경에 실패했습니다.'));
 }

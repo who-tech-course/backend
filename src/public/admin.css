@@ -71,6 +71,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 .pill.reviewer { background: #fef9c3; color: #854d0e; }
 .role-checkboxes { display: flex; gap: 8px; align-items: center; white-space: nowrap; }
 .role-checkboxes label { font-size: 13px; display: flex; align-items: center; gap: 4px; cursor: pointer; }
+.order-input { width: 48px; padding: 4px 6px; font-size: 12px; border: 1px solid #e2e8f0; border-radius: 6px; text-align: center; }
 .table-wrap { width: 100%; overflow: auto; border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; }
 table { width: 100%; border-collapse: collapse; min-width: 1220px; font-size: 13px; }
 th, td { padding: 12px 14px; border-bottom: 1px solid #edf2f7; vertical-align: top; text-align: left; }
