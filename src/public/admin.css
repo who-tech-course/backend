@@ -316,13 +316,14 @@ tr:last-child td { border-bottom: none; }
   }
 
   table {
-    min-width: 960px;
+    min-width: 1080px;
     font-size: 11px;
   }
 
   th,
   td {
     padding: 8px 9px;
+    white-space: nowrap;
   }
 
   .stack,
@@ -333,12 +334,43 @@ tr:last-child td { border-bottom: none; }
 
   .post-list,
   .pr-list {
-    min-width: 180px;
+    min-width: 220px;
   }
 
   .track-list,
   .role-toggle-group {
     gap: 4px;
+  }
+
+  .table-wrap .actions {
+    display: flex;
+    width: auto;
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+
+  .table-wrap button,
+  .table-wrap .btn-sm {
+    width: auto;
+    min-width: max-content;
+  }
+
+  .table-wrap .role-toggle-group {
+    flex-wrap: nowrap;
+  }
+
+  .table-wrap .link,
+  .table-wrap .post-item a,
+  .table-wrap .mono,
+  .table-wrap td strong,
+  .table-wrap td span {
+    writing-mode: horizontal-tb;
+    word-break: keep-all;
+  }
+
+  .table-wrap .link,
+  .table-wrap .post-item a {
+    white-space: nowrap;
   }
 
   .track-badge,
