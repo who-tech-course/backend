@@ -3,7 +3,12 @@ import type { MemberRepository } from '../../db/repositories/member.repository.j
 import type { BlogPostRepository } from '../../db/repositories/blog-post.repository.js';
 import { normalizeBlogUrl } from '../../shared/blog.js';
 
-const parser = new Parser();
+const parser = new Parser({
+  headers: {
+    'User-Agent': 'Mozilla/5.0 (compatible; RSS reader)',
+    Accept: 'application/rss+xml, application/xml, text/xml, */*',
+  },
+});
 
 function resolveRSSUrl(blogUrl: string): string[] {
   const normalizedBlogUrl = normalizeBlogUrl(blogUrl);
