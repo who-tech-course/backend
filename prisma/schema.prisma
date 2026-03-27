@@ -50,6 +50,8 @@ model MissionRepo {
   candidateReason String?
   nicknameRegex String?      // null이면 Workspace.nicknameRegex fallback
   cohortRegexRules String?   // JSON: [{"cohort": 7, "nicknameRegex": "..."}, ...]
+  syncMode      String       @default("continuous") // continuous | once
+  lastSyncAt    DateTime?
   workspaceId   Int
   workspace     Workspace    @relation(fields: [workspaceId], references: [id])
   submissions   Submission[]

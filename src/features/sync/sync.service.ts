@@ -68,12 +68,14 @@ export function createSyncService(deps: {
       track?: string | null;
       nicknameRegex?: string | null;
       cohortRegexRules?: string | null;
+      lastSyncAt?: Date | null;
     },
     workspaceRegex: RegExp,
     cohortRules: CohortRule[],
   ): Promise<{ synced: number }> => {
     const isCommonMission = repo.track === null || repo.track === undefined;
-    const prs = await fetchRepoPRs(octokit, org, repo.name);
+    const since = repo.lastSyncAt ?? undefined;
+    const prs = await fetchRepoPRs(octokit, org, repo.name, ...(since ? [{ since }] : []));
     const fallbackRegex = repo.nicknameRegex ? new RegExp(repo.nicknameRegex) : workspaceRegex;
     const submissions = parsePRsToSubmissions(
       prs,
@@ -139,6 +141,7 @@ export function createSyncService(deps: {
       synced++;
     }
 
+    await missionRepoRepo.touch(repo.id);
     return { synced };
   };
 
@@ -151,7 +154,10 @@ export function createSyncService(deps: {
     const workspaceRegex = new RegExp(workspace.nicknameRegex);
 
     const repos = await missionRepoRepo.findMany({ workspaceId });
-    const activeRepos = repos.filter((r) => r.status === 'active');
+    // once 레포는 lastSyncAt이 없을 때(첫 sync)만 실행
+    const activeRepos = repos.filter(
+      (r) => r.status === 'active' && (r.syncMode === 'continuous' || r.lastSyncAt === null),
+    );
 
     let totalSynced = 0;
     for (const repo of activeRepos) {

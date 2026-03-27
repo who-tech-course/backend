@@ -25,8 +25,9 @@ export async function fetchRepoPRs(
   octokit: Octokit,
   org: string,
   repo: string,
-  perPage = 100,
+  options: { perPage?: number; since?: Date } = {},
 ): Promise<Awaited<ReturnType<typeof octokit.pulls.list>>['data']> {
+  const { perPage = 100, since } = options;
   const allPRs = [];
   let page = 1;
 
@@ -35,11 +36,22 @@ export async function fetchRepoPRs(
       owner: org,
       repo,
       state: 'all',
+      sort: 'created',
+      direction: 'desc',
       per_page: perPage,
       page,
     });
 
-    allPRs.push(...data);
+    if (data.length === 0) break;
+
+    if (since) {
+      const fresh = data.filter((pr) => new Date(pr.created_at) > since);
+      allPRs.push(...fresh);
+      // 페이지 내 마지막 PR이 since보다 오래됐으면 더 이상 없음
+      if (fresh.length < data.length) break;
+    } else {
+      allPRs.push(...data);
+    }
 
     if (data.length < perPage) break;
     page++;

@@ -85,6 +85,7 @@
           </select>
         </div>
 
+        <div class="repo-section-label">계속 돌릴 레포 <span class="sub">(매 sync 실행)</span></div>
         <div class="table-wrap">
           <table>
             <thead>
@@ -94,10 +95,29 @@
                 <th>트랙/타입</th>
                 <th>설명 / 후보 사유</th>
                 <th>정규식</th>
+                <th>마지막 sync</th>
                 <th>작업</th>
               </tr>
             </thead>
-            <tbody id="repo-table-body"></tbody>
+            <tbody id="repo-table-body-continuous"></tbody>
+          </table>
+        </div>
+
+        <div class="repo-section-label" style="margin-top:20px">한 번만 돌릴 레포 <span class="sub">(최초 1회 후 skip)</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>이름</th>
+                <th>상태</th>
+                <th>트랙/타입</th>
+                <th>설명 / 후보 사유</th>
+                <th>정규식</th>
+                <th>마지막 sync</th>
+                <th>작업</th>
+              </tr>
+            </thead>
+            <tbody id="repo-table-body-once"></tbody>
           </table>
         </div>
       </div>
@@ -123,6 +143,10 @@
             <option value="active">active</option>
             <option value="candidate">candidate</option>
             <option value="excluded">excluded</option>
+          </select>
+          <select id="repo-sync-mode">
+            <option value="continuous">계속 sync</option>
+            <option value="once">한 번만</option>
           </select>
           <input type="text" id="repo-regex" placeholder="닉네임 정규식" />
           <button class="btn-primary" onclick="addRepo()">추가</button>

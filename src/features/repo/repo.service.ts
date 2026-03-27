@@ -39,6 +39,7 @@ export function createRepoService(deps: {
       track: string | null;
       type?: string;
       status?: string;
+      syncMode?: string;
       candidateReason?: string | null;
       nicknameRegex?: string;
       cohortRegexRules?: CohortRegexRule[];
@@ -52,6 +53,7 @@ export function createRepoService(deps: {
         track: input.track,
         type: input.type ?? 'individual',
         status: input.status ?? 'active',
+        syncMode: input.syncMode ?? 'continuous',
         candidateReason: input.candidateReason ?? null,
         nicknameRegex: input.nicknameRegex ?? null,
         cohortRegexRules: stringifyCohortRegexRules(input.cohortRegexRules),
@@ -67,6 +69,7 @@ export function createRepoService(deps: {
         track?: string | null;
         type?: string;
         status?: string;
+        syncMode?: string;
         candidateReason?: string | null;
         nicknameRegex?: string | null;
         cohortRegexRules?: CohortRegexRule[] | null;
@@ -77,6 +80,7 @@ export function createRepoService(deps: {
         ...(input.track !== undefined ? { track: input.track } : {}),
         ...(input.type !== undefined ? { type: input.type } : {}),
         ...(input.status !== undefined ? { status: input.status } : {}),
+        ...(input.syncMode !== undefined ? { syncMode: input.syncMode } : {}),
         ...(input.candidateReason !== undefined ? { candidateReason: input.candidateReason } : {}),
         ...(input.nicknameRegex !== undefined ? { nicknameRegex: input.nicknameRegex } : {}),
         ...(input.cohortRegexRules !== undefined

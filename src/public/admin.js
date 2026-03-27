@@ -69,38 +69,9 @@ function setRepoTab(tab) {
   renderRepos();
 }
 
-function renderRepos() {
-  const search = document.getElementById('repo-search').value.trim().toLowerCase();
-  const status = document.getElementById('repo-status-filter').value;
-  const track = document.getElementById('repo-track-filter').value;
-
-  const filtered = repoList.filter((repo) => {
-    const isCommon = repo.track === null;
-    if (repoTab === 'base' && isCommon) return false;
-    if (repoTab === 'common' && !isCommon) return false;
-
-    if (search && !repo.name.toLowerCase().includes(search)) {
-      return false;
-    }
-
-    if (status && repo.status !== status) {
-      return false;
-    }
-
-    if (track && repo.track !== track) {
-      return false;
-    }
-
-    return true;
-  });
-
-  const tbody = document.getElementById('repo-table-body');
-  if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" class="muted">조건에 맞는 레포가 없습니다.</td></tr>`;
-    return;
-  }
-
-  tbody.innerHTML = filtered.map((repo) => `
+function repoRow(repo) {
+  const syncedAt = repo.lastSyncAt ? new Date(repo.lastSyncAt).toLocaleString('ko-KR') : '없음';
+  return `
     <tr>
       <td>
         <div class="stack">
@@ -122,6 +93,7 @@ function renderRepos() {
         </div>
       </td>
       <td class="mono">${escapeHtml(formatRepoRegex(repo))}</td>
+      <td class="muted small">${syncedAt}</td>
       <td>
         <div class="actions">
           <button class="btn-sm btn-secondary" onclick="syncRepo(${repo.id}, this)">Sync</button>
@@ -131,7 +103,37 @@ function renderRepos() {
         </div>
       </td>
     </tr>
-  `).join('');
+  `;
+}
+
+function renderRepos() {
+  const search = document.getElementById('repo-search').value.trim().toLowerCase();
+  const status = document.getElementById('repo-status-filter').value;
+  const track = document.getElementById('repo-track-filter').value;
+
+  const filtered = repoList.filter((repo) => {
+    const isCommon = repo.track === null;
+    if (repoTab === 'base' && isCommon) return false;
+    if (repoTab === 'common' && !isCommon) return false;
+    if (search && !repo.name.toLowerCase().includes(search)) return false;
+    if (status && repo.status !== status) return false;
+    if (track && repo.track !== track) return false;
+    return true;
+  });
+
+  const continuous = filtered.filter((r) => r.syncMode !== 'once');
+  const once = filtered.filter((r) => r.syncMode === 'once');
+
+  const tbodyContinuous = document.getElementById('repo-table-body-continuous');
+  const tbodyOnce = document.getElementById('repo-table-body-once');
+
+  tbodyContinuous.innerHTML = continuous.length
+    ? continuous.map(repoRow).join('')
+    : `<tr><td colspan="7" class="muted">없음</td></tr>`;
+
+  tbodyOnce.innerHTML = once.length
+    ? once.map(repoRow).join('')
+    : `<tr><td colspan="7" class="muted">없음</td></tr>`;
 }
 
 function discoverRepos() {
@@ -160,6 +162,7 @@ function addRepo() {
     track: document.getElementById('repo-track').value || null,
     type: document.getElementById('repo-type').value,
     status: document.getElementById('repo-status').value,
+    syncMode: document.getElementById('repo-sync-mode').value,
     nicknameRegex: document.getElementById('repo-regex').value.trim() || null,
     cohortRegexRules: parseJsonOrNull(document.getElementById('repo-cohort-regex-rules').value.trim()),
   };
