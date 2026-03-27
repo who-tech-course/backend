@@ -1199,20 +1199,39 @@ function renderCohortRepos() {
     tbody.innerHTML = `<tr><td colspan="5" class="muted" style="text-align:center;padding:16px">추가된 레포 없음</td></tr>`;
     return;
   }
-  tbody.innerHTML = filtered.map((entry) => `
-    <tr>
-      <td class="muted small">${entry.order}</td>
-      <td><strong>${escapeHtml(entry.missionRepo.name)}</strong></td>
-      <td class="muted small">${entry.missionRepo.track ?? '공통'}</td>
-      <td class="muted small">${entry.missionRepo.level != null ? `레벨${entry.missionRepo.level}` : '-'}</td>
-      <td>
-        <div class="actions">
-          <input type="number" class="order-input" value="${entry.order}" onchange="setCohortRepoOrder(${entry.id}, this.value)" title="순서" style="width:52px" />
-          <button class="btn-sm btn-danger" onclick="deleteCohortRepo(${entry.id})">삭제</button>
-        </div>
-      </td>
-    </tr>
-  `).join('');
+
+  // level별 그룹핑 (null은 마지막)
+  const groups = new Map();
+  for (const entry of filtered) {
+    const level = entry.missionRepo.level;
+    if (!groups.has(level)) groups.set(level, []);
+    groups.get(level).push(entry);
+  }
+  const sortedLevels = [...groups.keys()].sort((a, b) => {
+    if (a === null) return 1;
+    if (b === null) return -1;
+    return a - b;
+  });
+
+  tbody.innerHTML = sortedLevels.flatMap((level) => {
+    const entries = groups.get(level).sort((a, b) => a.order - b.order);
+    const header = `<tr><td colspan="5" style="background:#f8fafc;font-size:12px;font-weight:700;color:#475569;padding:8px 14px">${level != null ? `${level}단계` : '단계 미지정'} (${entries.length}개)</td></tr>`;
+    const rows = entries.map((entry) => `
+      <tr>
+        <td class="muted small">${entry.order}</td>
+        <td><strong>${escapeHtml(entry.missionRepo.name)}</strong></td>
+        <td class="muted small">${entry.missionRepo.track ?? '공통'}</td>
+        <td class="muted small">${level != null ? `${level}단계` : '-'}</td>
+        <td>
+          <div class="actions">
+            <input type="number" class="order-input" value="${entry.order}" onchange="setCohortRepoOrder(${entry.id}, this.value)" title="순서" style="width:52px" />
+            <button class="btn-sm btn-danger" onclick="deleteCohortRepo(${entry.id})">삭제</button>
+          </div>
+        </td>
+      </tr>
+    `);
+    return [header, ...rows];
+  }).join('');
 }
 
 function addCohortRepo() {
