@@ -53,11 +53,31 @@ function loadWorkspace() {
     });
 }
 
+let blogSyncCountdownTimer = null;
+
 function updateBlogSyncToggle(enabled) {
   const btn = document.getElementById('blog-sync-toggle');
   if (!btn) return;
-  btn.textContent = enabled ? '블로그 자동수집 ON' : '블로그 자동수집 OFF';
   btn.classList.toggle('active', enabled);
+
+  clearInterval(blogSyncCountdownTimer);
+  blogSyncCountdownTimer = null;
+
+  if (enabled) {
+    const updateCountdown = () => {
+      const now = new Date();
+      const nextHour = new Date(now);
+      nextHour.setHours(now.getHours() + 1, 0, 0, 0);
+      const diffMs = nextHour - now;
+      const diffMin = Math.floor(diffMs / 60000);
+      const diffSec = Math.floor((diffMs % 60000) / 1000);
+      btn.textContent = `블로그 자동수집 ON · ${diffMin}분 ${diffSec}초 후`;
+    };
+    updateCountdown();
+    blogSyncCountdownTimer = setInterval(updateCountdown, 1000);
+  } else {
+    btn.textContent = '블로그 자동수집 OFF';
+  }
 }
 
 function toggleBlogSync() {

@@ -154,10 +154,8 @@ export function createSyncService(deps: {
     const workspaceRegex = new RegExp(workspace.nicknameRegex);
 
     const repos = await missionRepoRepo.findMany({ workspaceId });
-    // once 레포는 lastSyncAt이 없을 때(첫 sync)만 실행
-    const activeRepos = repos.filter(
-      (r) => r.status === 'active' && (r.syncMode === 'continuous' || r.lastSyncAt === null),
-    );
+    // 전체 sync는 한번만 돌릴 레포 중 아직 sync되지 않은 것만 실행
+    const activeRepos = repos.filter((r) => r.status === 'active' && r.syncMode === 'once' && r.lastSyncAt === null);
 
     let totalSynced = 0;
     for (const repo of activeRepos) {
