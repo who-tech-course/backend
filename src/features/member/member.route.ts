@@ -51,6 +51,32 @@ export function createMemberRouter(service: MemberService) {
     }),
   );
 
+  router.post(
+    '/refresh-profiles',
+    asyncHandler(async (req, res) => {
+      const limitValue = req.query['limit'];
+      const limit = typeof limitValue === 'string' ? Number(limitValue) : 30;
+      const cohortValue = req.query['cohort'];
+      const cohort = typeof cohortValue === 'string' ? Number(cohortValue) : undefined;
+      const staleHoursValue = req.query['staleHours'];
+      const staleHours = typeof staleHoursValue === 'string' ? Number(staleHoursValue) : undefined;
+      res.json(
+        await service.refreshWorkspaceProfiles({
+          ...(Number.isFinite(limit) ? { limit } : {}),
+          ...(cohort && !Number.isNaN(cohort) ? { cohort } : {}),
+          ...(staleHours && !Number.isNaN(staleHours) ? { staleHours } : {}),
+        }),
+      );
+    }),
+  );
+
+  router.post(
+    '/:id/refresh-profile',
+    asyncHandler(async (req, res) => {
+      res.json(await service.refreshMemberProfile(parseId(req.params['id'])));
+    }),
+  );
+
   router.patch(
     '/:id',
     asyncHandler(async (req, res) => {

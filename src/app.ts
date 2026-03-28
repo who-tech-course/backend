@@ -34,6 +34,8 @@ import { createSyncRouter } from './features/sync/sync.route.js';
 import { createBlogRouter } from './features/blog/blog.route.js';
 import { createCohortRepoRouter } from './features/cohort-repo/cohort-repo.route.js';
 import { createActivityLogRouter } from './features/activity-log/activity-log.route.js';
+import { createMemberPublicService } from './features/member/member.public.service.js';
+import { createMemberPublicRouter } from './features/member/member.public.route.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -51,12 +53,13 @@ const activityLogRepo = createActivityLogRepository(db);
 
 const workspaceService = createWorkspaceService({ workspaceRepo });
 const syncService = createSyncService({ memberRepo, missionRepoRepo, submissionRepo, workspaceRepo });
-const memberService = createMemberService({ memberRepo, blogPostRepo, workspaceService });
+const memberService = createMemberService({ memberRepo, blogPostRepo, workspaceService, octokit });
 const repoService = createRepoService({ missionRepoRepo, workspaceService, syncService, octokit });
 const blogService = createBlogService({ memberRepo, blogPostRepo });
 const cohortRepoService = createCohortRepoService({ cohortRepoRepo, missionRepoRepo, workspaceService });
 const activityLogService = createActivityLogService({ activityLogRepo, workspaceService });
 const blogAdminService = createBlogAdminService({ memberRepo, workspaceService, blogService, octokit });
+const memberPublicService = createMemberPublicService({ memberRepo, blogPostRepo, cohortRepoRepo, workspaceService });
 const syncAdminService = createSyncAdminService({
   memberRepo,
   missionRepoRepo,
@@ -71,8 +74,10 @@ app.use(express.json());
 app.use('/admin/ui', express.static(join(__dirname, 'public')));
 
 app.get('/', (_req, res) => {
-  res.json({ message: 'who-tech-course API' });
+  res.json({ message: 'who.tech API' });
 });
+
+app.use('/members', createMemberPublicRouter(memberPublicService));
 
 app.use('/admin', adminAuth);
 app.use('/admin/workspace', createWorkspaceRouter(workspaceService));

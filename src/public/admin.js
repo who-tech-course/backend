@@ -273,6 +273,31 @@ function inlineEditLevel(el, id) {
   inlineText(el, repo.level != null ? String(repo.level) : '', (val) => patchRepo(id, { level: val ? Number(val) : null }), 'number');
 }
 
+function updateRepoLevel(repoId, level) {
+  return fetch(`/admin/repos/${repoId}`, {
+    method: 'PATCH',
+    headers: authHeaders('application/json'),
+    body: JSON.stringify({ level }),
+  })
+    .then((response) => {
+      if (!response.ok) return parseErrorResponse(response);
+      return response.json();
+    })
+    .then((updated) => {
+      const idx = repoList.findIndex((r) => r.id === repoId);
+      if (idx !== -1) repoList[idx] = { ...repoList[idx], ...updated };
+      return updated;
+    });
+}
+
+function changeCohortRepoLevel(repoId, value) {
+  const level = value ? Number(value) : null;
+  if (value && Number.isNaN(level)) return;
+  updateRepoLevel(repoId, level)
+    .then(() => loadCohortRepos())
+    .catch(() => alert('레벨 변경 실패'));
+}
+
 function inlineEditCohorts(el, id) {
   const repo = repoList.find((r) => r.id === id);
   if (!repo) return;
@@ -816,6 +841,7 @@ function renderMembers() {
       </td>
       <td>
         <div class="actions">
+          <button class="btn-sm btn-ghost" onclick="refreshMemberProfile(${member.id}, '${escapeHtml(member.githubId)}')">프로필</button>
           <button class="btn-sm btn-ghost" onclick="editMember(${member.id})">수정</button>
           <button class="btn-sm btn-danger" onclick="deleteMember(${member.id})">삭제</button>
         </div>
@@ -907,6 +933,52 @@ function addMember() {
       return Promise.all([loadMembers(), loadStatus()]);
     })
     .catch(() => alert('멤버 추가에 실패했습니다.'));
+}
+
+function refreshMemberProfiles() {
+  const cohort = document.getElementById('member-cohort-filter').value;
+  const params = new URLSearchParams({ limit: '50', staleHours: '24' });
+  if (cohort) params.set('cohort', cohort);
+
+  fetch(`/admin/members/refresh-profiles?${params.toString()}`, {
+    method: 'POST',
+    headers: authHeaders(),
+  })
+    .then((response) => {
+      if (!response.ok) return parseErrorResponse(response);
+      return response.json();
+    })
+    .then((result) => {
+      toast(`프로필 갱신 ${result.refreshed}건`);
+      addLog(`프로필 갱신 완료 — 확인 ${result.checked}명, 갱신 ${result.refreshed}명, 실패 ${result.failed}명`, result.failed ? 'err' : 'ok');
+      return loadMembers();
+    })
+    .catch((err) => {
+      const detail = err?.message ?? String(err);
+      toast('프로필 갱신 실패');
+      addLog(`프로필 갱신 실패: ${detail}`, 'err');
+    });
+}
+
+function refreshMemberProfile(id, githubId) {
+  fetch(`/admin/members/${id}/refresh-profile`, {
+    method: 'POST',
+    headers: authHeaders(),
+  })
+    .then((response) => {
+      if (!response.ok) return parseErrorResponse(response);
+      return response.json();
+    })
+    .then(() => {
+      toast('프로필 갱신 완료');
+      addLog(`프로필 갱신 완료: ${githubId}`, 'ok');
+      return loadMembers();
+    })
+    .catch((err) => {
+      const detail = err?.message ?? String(err);
+      toast('프로필 갱신 실패');
+      addLog(`프로필 갱신 실패: ${githubId} — ${detail}`, 'err');
+    });
 }
 
 function editMember(id) {
@@ -1486,7 +1558,17 @@ function renderCohortRepos() {
         <td class="muted small">${entry.order}</td>
         <td><strong>${escapeHtml(entry.missionRepo.name)}</strong></td>
         <td class="muted small">${entry.missionRepo.track ?? '공통'}</td>
-        <td class="muted small">${level != null ? `${level}단계` : '-'}</td>
+        <td>
+          <select class="inline-sel" onchange="changeCohortRepoLevel(${entry.missionRepo.id}, this.value)">
+            <option value="" ${level == null ? 'selected' : ''}>-</option>
+            <option value="1" ${level === 1 ? 'selected' : ''}>1단계</option>
+            <option value="2" ${level === 2 ? 'selected' : ''}>2단계</option>
+            <option value="3" ${level === 3 ? 'selected' : ''}>3단계</option>
+            <option value="4" ${level === 4 ? 'selected' : ''}>4단계</option>
+            <option value="5" ${level === 5 ? 'selected' : ''}>5단계</option>
+            <option value="6" ${level === 6 ? 'selected' : ''}>6단계</option>
+          </select>
+        </td>
         <td>
           <div class="actions">
             <input type="number" class="order-input" value="${entry.order}" onchange="setCohortRepoOrder(${entry.id}, this.value)" title="순서" style="width:52px" />
@@ -1505,15 +1587,28 @@ function addCohortRepo() {
   const select = document.getElementById('cohort-repo-select');
   const missionRepoId = Number(select.value);
   if (!missionRepoId) { alert('레포를 선택하세요.'); return; }
+  const levelRaw = document.getElementById('cohort-repo-level').value;
+  const level = levelRaw ? Number(levelRaw) : null;
   const order = Number(document.getElementById('cohort-repo-order').value) || 0;
 
-  fetch('/admin/cohort-repos', {
-    method: 'POST',
-    headers: authHeaders('application/json'),
-    body: JSON.stringify({ cohort, missionRepoId, order }),
-  })
+  const saveLevel = () => {
+    if (levelRaw === '') return Promise.resolve();
+    return updateRepoLevel(missionRepoId, level);
+  };
+
+  saveLevel()
+    .then(() => fetch('/admin/cohort-repos', {
+      method: 'POST',
+      headers: authHeaders('application/json'),
+      body: JSON.stringify({ cohort, missionRepoId, order }),
+    }))
     .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
-    .then(() => { toast('레포 추가됨'); loadCohortRepos(); })
+    .then(() => {
+      document.getElementById('cohort-repo-level').value = '';
+      document.getElementById('cohort-repo-order').value = '';
+      toast('레포 추가됨');
+      loadCohortRepos();
+    })
     .catch(() => alert('추가 실패 (중복일 수 있음)'));
 }
 

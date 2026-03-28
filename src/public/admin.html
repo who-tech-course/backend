@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Admin - who-tech-course</title>
+    <title>Admin - who.tech</title>
     <link rel="stylesheet" href="/admin/ui/admin.css" />
   </head>
   <body>
@@ -17,7 +17,7 @@
     </div>
 
     <div class="container" id="main" style="display:none">
-      <h1>who-tech-course 어드민</h1>
+      <h1>who.tech 어드민</h1>
 
       <div class="grid stats">
         <div class="card">
@@ -183,6 +183,7 @@
             <div class="sub">대표 닉네임, 블로그 링크, 최근 글 목록을 보고 수정/삭제합니다.</div>
           </div>
           <div class="actions">
+            <button class="btn-secondary" onclick="refreshMemberProfiles()">프로필 새로고침</button>
             <button class="btn-danger" onclick="deleteAllMembers()">전체 삭제</button>
           </div>
         </div>
@@ -299,6 +300,15 @@
         <div class="form-inline">
           <select id="cohort-repo-select" style="flex:1">
             <option value="">레포 선택</option>
+          </select>
+          <select id="cohort-repo-level" style="width:110px">
+            <option value="">레벨 미지정</option>
+            <option value="1">레벨 1</option>
+            <option value="2">레벨 2</option>
+            <option value="3">레벨 3</option>
+            <option value="4">레벨 4</option>
+            <option value="5">레벨 5</option>
+            <option value="6">레벨 6</option>
           </select>
           <input type="number" id="cohort-repo-order" placeholder="순서" min="0" style="width:80px" />
           <button class="btn-primary" onclick="addCohortRepo()">추가</button>
