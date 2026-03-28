@@ -380,6 +380,10 @@ export function createRepoService(deps: {
       return results;
     },
 
+    resetRepoSyncStatus: async (id: number) => {
+      await missionRepoRepo.update(id, { lastSyncAt: null });
+    },
+
     deleteRepo: (id: number) => missionRepoRepo.deleteWithSubmissions(id),
 
     deleteAllRepos: async () => {

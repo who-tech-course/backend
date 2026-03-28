@@ -12,68 +12,62 @@ model Workspace {
   name            String        @unique
   githubOrg       String
   nicknameRegex   String
-  cohortRules     String        // JSON: [{"year": 2026, "cohort": 8}, ...]
+  cohortRules     String
   blogSyncEnabled Boolean       @default(true)
-  members         Member[]
-  missionRepos    MissionRepo[]
-  cohortRepos     CohortRepo[]
-  activityLogs    ActivityLog[]
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+  activityLogs    ActivityLog[]
+  cohortRepos     CohortRepo[]
+  members         Member[]
+  missionRepos    MissionRepo[]
 }
 
 model Member {
-  id             Int          @id @default(autoincrement())
-  githubUserId   Int?
-  githubId       String
-  previousGithubIds String?   // JSON: ["old-login", ...]
-  nickname       String?
-  manualNickname String?
-  nicknameStats  String?      // JSON: [{"nickname":"...", "count":2, "lastSeenAt":"..."}]
-  avatarUrl      String?
-  profileFetchedAt DateTime?
-  profileRefreshError String?
-  cohort         Int?
-  blog           String?
-  rssStatus      String       @default("unknown") // unknown | available | unavailable | error
-  rssUrl         String?
-  rssCheckedAt   DateTime?
-  rssError       String?
-  lastPostedAt   DateTime?    // RSS에서 수집한 가장 최근 글의 publishedAt
-  roles          String       @default("[\"crew\"]") // JSON: ["crew"] | ["coach"] | ["crew","reviewer"] 등
-  workspaceId    Int
-  workspace   Workspace    @relation(fields: [workspaceId], references: [id])
-  submissions      Submission[]
-  blogPosts        BlogPost[]
-  blogPostsLatest  BlogPostLatest[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id              Int              @id @default(autoincrement())
+  githubId        String
+  nickname        String?
+  manualNickname  String?
+  nicknameStats   String?
+  avatarUrl       String?
+  cohort          Int?
+  blog            String?
+  rssStatus       String           @default("unknown")
+  rssUrl          String?
+  rssCheckedAt    DateTime?
+  rssError        String?
+  roles           String           @default("[\"crew\"]")
+  workspaceId     Int
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  blogPosts       BlogPost[]
+  blogPostsLatest BlogPostLatest[]
+  workspace       Workspace        @relation(fields: [workspaceId], references: [id])
+  submissions     Submission[]
 
   @@unique([githubId, workspaceId])
-  @@unique([githubUserId, workspaceId])
 }
 
 model MissionRepo {
-  id            Int          @id @default(autoincrement())
-  githubRepoId  Int?         @unique
-  name          String
-  repoUrl       String
-  description   String?
-  track         String?      // frontend | backend | android | null(공통 미션)
-  type          String       @default("individual") // individual | integration
-  tabCategory   String       @default("base") // base | common | excluded | precourse
-  status        String       @default("active") // active | candidate | excluded
-  candidateReason String?
-  nicknameRegex String?      // null이면 Workspace.nicknameRegex fallback
-  cohortRegexRules String?   // JSON: [{"cohort": 7, "nicknameRegex": "..."}, ...]
-  cohorts       String?      // JSON: [7, 8] — sync 기수 필터용
-  level         Int?         // 1 | 2 | 3 | 4 — 레벨 (null이면 미분류)
-  syncMode      String       @default("continuous") // continuous | once
-  lastSyncAt    DateTime?
-  workspaceId   Int
-  workspace     Workspace    @relation(fields: [workspaceId], references: [id])
-  submissions   Submission[]
-  cohortRepos   CohortRepo[]
+  id               Int          @id @default(autoincrement())
+  githubRepoId     Int?         @unique
+  name             String
+  repoUrl          String
+  description      String?
+  track            String?
+  type             String       @default("individual")
+  tabCategory      String       @default("base")
+  status           String       @default("active")
+  candidateReason  String?
+  nicknameRegex    String?
+  cohortRegexRules String?
+  cohorts          String?
+  level            Int?
+  syncMode         String       @default("continuous")
+  lastSyncAt       DateTime?
+  workspaceId      Int
+  cohortRepos      CohortRepo[]
+  workspace        Workspace    @relation(fields: [workspaceId], references: [id])
+  submissions      Submission[]
 
   @@unique([name, workspaceId])
 }
@@ -83,9 +77,9 @@ model CohortRepo {
   cohort        Int
   order         Int         @default(0)
   missionRepoId Int
-  missionRepo   MissionRepo @relation(fields: [missionRepoId], references: [id], onDelete: Cascade)
   workspaceId   Int
   workspace     Workspace   @relation(fields: [workspaceId], references: [id])
+  missionRepo   MissionRepo @relation(fields: [missionRepoId], references: [id], onDelete: Cascade)
 
   @@unique([cohort, missionRepoId])
 }
@@ -98,8 +92,8 @@ model Submission {
   submittedAt   DateTime
   memberId      Int
   missionRepoId Int
-  member        Member      @relation(fields: [memberId], references: [id])
   missionRepo   MissionRepo @relation(fields: [missionRepoId], references: [id])
+  member        Member      @relation(fields: [memberId], references: [id])
 
   @@unique([prNumber, missionRepoId])
 }
@@ -110,11 +104,10 @@ model BlogPost {
   title       String
   publishedAt DateTime
   memberId    Int
-  member      Member   @relation(fields: [memberId], references: [id])
   createdAt   DateTime @default(now())
+  member      Member   @relation(fields: [memberId], references: [id])
 }
 
-// 최근 7일치 스냅샷 — sync마다 갱신
 model BlogPostLatest {
   id          Int      @id @default(autoincrement())
   url         String   @unique
@@ -124,12 +117,11 @@ model BlogPostLatest {
   member      Member   @relation(fields: [memberId], references: [id])
 }
 
-// 어드민 활동 로그 — 7일 보관
 model ActivityLog {
   id          Int       @id @default(autoincrement())
-  type        String    // run | ok | err | info
+  type        String
   message     String
   workspaceId Int
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }

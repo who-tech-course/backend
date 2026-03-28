@@ -63,6 +63,14 @@ export function createRepoRouter(service: RepoService) {
     }),
   );
 
+  router.post(
+    '/:id/reset-sync',
+    asyncHandler(async (req, res) => {
+      await service.resetRepoSyncStatus(parseId(req.params['id']));
+      res.status(204).end();
+    }),
+  );
+
   router.get(
     '/sync-jobs/:jobId',
     asyncHandler(async (req, res) => {

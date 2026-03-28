@@ -371,6 +371,7 @@ function repoRow(repo) {
       <td>
         <div class="actions">
           <button class="btn-sm btn-secondary" onclick="syncRepo(${repo.id}, this)">Sync</button>
+          <button class="btn-sm btn-ghost" onclick="resetSync(${repo.id})">초기화</button>
           <button class="btn-sm btn-ghost" onclick="detectRepoRegex(${repo.id})">감지</button>
           <button class="btn-sm btn-danger" onclick="deleteRepo(${repo.id})">삭제</button>
         </div>
@@ -657,6 +658,21 @@ function syncRepo(id, button) {
       toast('단건 sync 실패');
       addLog(`${name} sync 실패: ${detail}`, 'err');
     })
+}
+
+function resetSync(id) {
+  const repo = repoList.find((r) => r.id === id);
+  const name = repo?.name ?? `#${id}`;
+  if (!confirm(`${name}의 동기화 상태를 초기화하시겠습니까? (저장된 제출물은 유지되지만 다음 Sync 시 모든 PR을 다시 훑습니다)`)) return;
+
+  fetch(`/admin/repos/${id}/reset-sync`, { method: 'POST', headers: authHeaders() })
+    .then((response) => {
+      if (!response.ok) throw new Error('failed');
+      toast('동기화 초기화 완료');
+      addLog(`${name} 동기화 상태 초기화 완료`, 'ok');
+      return loadRepos();
+    })
+    .catch(() => alert('초기화에 실패했습니다.'));
 }
 
 function triggerSync() {
