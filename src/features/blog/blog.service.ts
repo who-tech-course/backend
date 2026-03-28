@@ -212,6 +212,12 @@ async function fetchRSSItems(blogUrl: string): Promise<{
   };
 }
 
+// 단일 URL에 RSS가 있는지 확인 (backfill 시 후보 검사용)
+export async function probeRss(blogUrl: string): Promise<RssCheckResult> {
+  const { rssCheck } = await fetchRSSItems(blogUrl);
+  return rssCheck;
+}
+
 export function createBlogService(deps: { memberRepo: MemberRepository; blogPostRepo: BlogPostRepository }) {
   const { memberRepo, blogPostRepo } = deps;
 

@@ -115,6 +115,69 @@ export async function fetchUserProfile(
   };
 }
 
+function extractUrlsFromText(text: string): string[] {
+  const matches = text.match(/https?:\/\/[^\s)>\]"',]+/g) ?? [];
+  return matches.map((u) => normalizeBlogUrl(u)).filter((u): u is string => u !== null);
+}
+
+export async function fetchUserBlogCandidates(
+  octokit: Octokit,
+  input: { username?: string; githubUserId?: number | null },
+): Promise<{
+  profile: { githubUserId: number | null; githubId: string; avatarUrl: string | null };
+  candidates: string[];
+}> {
+  let data;
+
+  if (input.githubUserId != null) {
+    const response = await octokit.request('GET /user/{account_id}', { account_id: input.githubUserId });
+    data = response.data;
+  } else if (input.username) {
+    const response = await octokit.users.getByUsername({ username: input.username });
+    data = response.data;
+  } else {
+    throw new Error('username or githubUserId required');
+  }
+
+  const seen = new Set<string>();
+  const candidates: string[] = [];
+
+  const push = (url: string | null | undefined) => {
+    const normalized = normalizeBlogUrl(url ?? null);
+    if (normalized && !seen.has(normalized)) {
+      seen.add(normalized);
+      candidates.push(normalized);
+    }
+  };
+
+  // 1. blog 필드
+  push(data.blog);
+
+  // 2. bio에서 URL 추출
+  if (data.bio) {
+    for (const url of extractUrlsFromText(data.bio)) push(url);
+  }
+
+  // 3. social_accounts API
+  try {
+    const { data: socials } = await octokit.request('GET /users/{username}/social_accounts', {
+      username: data.login,
+    });
+    for (const s of socials) push(s.url);
+  } catch {
+    // 실패해도 무시
+  }
+
+  return {
+    profile: {
+      githubUserId: data.id ?? input.githubUserId ?? null,
+      githubId: data.login,
+      avatarUrl: data.avatar_url ?? null,
+    },
+    candidates,
+  };
+}
+
 export async function fetchUserBlogUrl(octokit: Octokit, username: string): Promise<string | null> {
   const { blog } = await fetchUserProfile(octokit, { username });
   return blog;
