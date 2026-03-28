@@ -570,6 +570,65 @@ function deleteRepo(id) {
     .catch(() => alert('레포 삭제에 실패했습니다.'));
 }
 
+function pollRepoSyncJob(jobId, { name, button, defaultButtonText, doneLabel, doneToast, failLabel }) {
+  const poll = () => {
+    fetch(`/admin/repos/sync-jobs/${jobId}`, { headers: authHeaders() })
+      .then((response) => {
+        if (!response.ok) return parseErrorResponse(response);
+        return response.json();
+      })
+      .then((job) => {
+        const progressText =
+          job.progress && job.status !== 'queued'
+            ? ` ${job.progress.percent}% (${job.progress.processed}/${job.progress.total || 0})`
+            : '';
+        document.getElementById('sync-result').textContent = `${job.repoName} ${job.message}${progressText}`;
+
+        if (job.status === 'queued' || job.status === 'running') {
+          button.textContent =
+            job.status === 'queued' ? '대기 중...' : `${Math.max(job.progress?.percent ?? 0, 1)}%`;
+          setTimeout(poll, 2000);
+          return;
+        }
+
+        if (job.status === 'completed') {
+          const synced = job.result?.synced ?? 0;
+          toast(doneToast(synced));
+          document.getElementById('sync-result').textContent = doneLabel(synced);
+          addLog(`${name} sync 완료 — ${synced}건`, 'ok');
+          if (job.result?.failures?.length) {
+            job.result.failures.forEach((f) => addLog(`  └ PR #${f.prNumber} 실패: ${f.error}`, 'err'));
+          }
+          Promise.all([loadStatus(), loadMembers(), loadRepos()]);
+          return;
+        }
+
+        const detail = job.error ?? job.message ?? 'sync 실패';
+        toast('단건 sync 실패');
+        addLog(`${failLabel}: ${detail}`, 'err');
+      })
+      .catch((err) => {
+        const detail = err?.message ?? String(err);
+        addLog(`${failLabel}: ${detail}`, 'err');
+      })
+      .finally(() => {
+        fetch(`/admin/repos/sync-jobs/${jobId}`, { headers: authHeaders() })
+          .then((response) => (response.ok ? response.json() : null))
+          .then((job) => {
+            if (job?.status === 'queued' || job?.status === 'running') return;
+            button.disabled = false;
+            button.textContent = defaultButtonText;
+          })
+          .catch(() => {
+            button.disabled = false;
+            button.textContent = defaultButtonText;
+          });
+      });
+  };
+
+  poll();
+}
+
 
 function syncRepo(id, button) {
   const repo = repoList.find((r) => r.id === id);
@@ -582,24 +641,22 @@ function syncRepo(id, button) {
       if (!response.ok) return parseErrorResponse(response);
       return response.json();
     })
-    .then((data) => {
-      toast(`${data.synced}건 수집됨`);
-      document.getElementById('sync-result').textContent = `${data.synced}건 수집 완료`;
-      addLog(`${name} sync 완료 — ${data.synced}건`, 'ok');
-      if (data.failures?.length) {
-        data.failures.forEach((f) => addLog(`  └ PR #${f.prNumber} 실패: ${f.error}`, 'err'));
-      }
-      return Promise.all([loadStatus(), loadMembers()]);
+    .then((job) => {
+      addLog(`${name} sync 작업 등록 — ${job.id}`, 'info');
+      pollRepoSyncJob(job.id, {
+        name,
+        button,
+        defaultButtonText: 'Sync',
+        doneLabel: (synced) => `${synced}건 수집 완료`,
+        doneToast: (synced) => `${synced}건 수집됨`,
+        failLabel: `${name} sync 실패`,
+      });
     })
     .catch((err) => {
       const detail = err?.message ?? String(err);
       toast('단건 sync 실패');
       addLog(`${name} sync 실패: ${detail}`, 'err');
     })
-    .finally(() => {
-      button.disabled = false;
-      button.textContent = 'Sync';
-    });
 }
 
 function triggerSync() {
@@ -674,15 +731,25 @@ function triggerTsAndLearningTest() {
   button.textContent = '테스트 중...';
   addLog('ts-and-learning 테스트 sync 중...', 'run');
   fetch(`/admin/repos/${repo.id}/sync`, { method: 'POST', headers: authHeaders() })
-    .then((response) => response.json())
-    .then((data) => {
-      document.getElementById('sync-result').textContent = `ts-and-learning ${data.synced}건 수집`;
-      toast(`ts-and-learning 테스트 완료 (${data.synced}건)`);
-      addLog(`ts-and-learning 테스트 완료 — ${data.synced}건`, 'ok');
-      return Promise.all([loadStatus(), loadMembers()]);
+    .then((response) => {
+      if (!response.ok) return parseErrorResponse(response);
+      return response.json();
     })
-    .catch(() => { toast('ts-and-learning 테스트 실패'); addLog('ts-and-learning 테스트 실패', 'err'); })
-    .finally(() => {
+    .then((job) => {
+      addLog(`ts-and-learning 테스트 작업 등록 — ${job.id}`, 'info');
+      pollRepoSyncJob(job.id, {
+        name: 'ts-and-learning 테스트',
+        button,
+        defaultButtonText: 'ts-and-learning 테스트',
+        doneLabel: (synced) => `ts-and-learning ${synced}건 수집`,
+        doneToast: (synced) => `ts-and-learning 테스트 완료 (${synced}건)`,
+        failLabel: 'ts-and-learning 테스트 실패',
+      });
+    })
+    .catch((err) => {
+      const detail = err?.message ?? String(err);
+      toast('ts-and-learning 테스트 실패');
+      addLog(`ts-and-learning 테스트 실패: ${detail}`, 'err');
       button.disabled = false;
       button.textContent = 'ts-and-learning 테스트';
     });

@@ -1,7 +1,9 @@
 import type { Octokit } from '@octokit/rest';
+import { randomUUID } from 'crypto';
 import type { MissionRepoRepository } from '../../db/repositories/mission-repo.repository.js';
 import type { WorkspaceService } from '../workspace/workspace.service.js';
 import type { SyncService } from '../sync/sync.service.js';
+import { HttpError } from '../../shared/http.js';
 import {
   parseCohortRegexRules,
   parseCohorts,
@@ -56,6 +58,41 @@ export function createRepoService(deps: {
   octokit: Octokit;
 }) {
   const { missionRepoRepo, workspaceService, syncService, octokit } = deps;
+  type RepoSyncResult = { synced: number; failures: { prNumber: number; prUrl: string; error: string }[] };
+  type RepoSyncJob = {
+    id: string;
+    repoId: number;
+    repoName: string;
+    status: 'queued' | 'running' | 'completed' | 'failed';
+    message: string;
+    startedAt: Date;
+    finishedAt: Date | null;
+    progress: { total: number; processed: number; synced: number; percent: number; phase: string };
+    result: RepoSyncResult | null;
+    error: string | null;
+  };
+  const syncJobs = new Map<string, RepoSyncJob>();
+  const runningRepoJobs = new Map<number, string>();
+
+  const cleanupJobs = () => {
+    const cutoff = Date.now() - 6 * 60 * 60 * 1000;
+    for (const [jobId, job] of syncJobs.entries()) {
+      if (job.finishedAt && job.finishedAt.getTime() < cutoff) syncJobs.delete(jobId);
+    }
+  };
+
+  const serializeJob = (job: RepoSyncJob) => ({
+    id: job.id,
+    repoId: job.repoId,
+    repoName: job.repoName,
+    status: job.status,
+    message: job.message,
+    startedAt: job.startedAt,
+    finishedAt: job.finishedAt,
+    progress: job.progress,
+    result: job.result,
+    error: job.error,
+  });
 
   const toResponse = (repo: Awaited<ReturnType<MissionRepoRepository['findByIdOrThrow']>>) => ({
     ...repo,
@@ -145,19 +182,72 @@ export function createRepoService(deps: {
       return toResponse(repo);
     },
 
-    syncRepoById: async (
-      id: number,
-    ): Promise<{ synced: number; failures: { prNumber: number; prUrl: string; error: string }[] }> => {
+    enqueueRepoSyncById: async (id: number) => {
+      cleanupJobs();
+      const existingJobId = runningRepoJobs.get(id);
+      if (existingJobId) {
+        const existingJob = syncJobs.get(existingJobId);
+        if (existingJob) return serializeJob(existingJob);
+      }
+
       const context = await workspaceService.getSyncContext();
       const repo = await missionRepoRepo.findByIdOrThrow(id);
-      return syncService.syncRepo(
-        octokit,
-        context.id,
-        context.githubOrg,
-        repo,
-        context.workspaceRegex,
-        context.cohortRules,
-      );
+      const job: RepoSyncJob = {
+        id: randomUUID(),
+        repoId: repo.id,
+        repoName: repo.name,
+        status: 'queued',
+        message: `${repo.name} sync 대기 중`,
+        startedAt: new Date(),
+        finishedAt: null,
+        progress: { total: 0, processed: 0, synced: 0, percent: 0, phase: '대기 중' },
+        result: null,
+        error: null,
+      };
+      syncJobs.set(job.id, job);
+      runningRepoJobs.set(repo.id, job.id);
+
+      void Promise.resolve().then(async () => {
+        job.status = 'running';
+        job.message = `${repo.name} sync 실행 중`;
+        try {
+          const result = await syncService.syncRepo(
+            octokit,
+            context.id,
+            context.githubOrg,
+            repo,
+            context.workspaceRegex,
+            context.cohortRules,
+            (progress) => {
+              job.progress = progress;
+              job.message = `${repo.name} sync ${progress.phase} (${progress.processed}/${progress.total})`;
+            },
+          );
+          job.status = 'completed';
+          job.message = `${repo.name} sync 완료`;
+          job.result = result;
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error);
+          job.status = 'failed';
+          job.message = `${repo.name} sync 실패`;
+          job.error = detail;
+        } finally {
+          job.finishedAt = new Date();
+          runningRepoJobs.delete(repo.id);
+          cleanupJobs();
+        }
+      });
+
+      return serializeJob(job);
+    },
+
+    getRepoSyncJob: async (jobId: string) => {
+      cleanupJobs();
+      const job = syncJobs.get(jobId);
+      if (!job) {
+        throw new HttpError(404, 'sync job not found');
+      }
+      return serializeJob(job);
     },
 
     refreshRepoCandidates: async (): Promise<{ discovered: number; created: number; updated: number }> => {

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { asyncHandler } from '../../shared/http.js';
+import { asyncHandler, HttpError } from '../../shared/http.js';
 import { parseId, parseRepoCreateInput, parseRepoUpdateInput } from '../../shared/validation.js';
 import type { RepoService } from './repo.service.js';
 
@@ -59,7 +59,18 @@ export function createRepoRouter(service: RepoService) {
   router.post(
     '/:id/sync',
     asyncHandler(async (req, res) => {
-      res.json(await service.syncRepoById(parseId(req.params['id'])));
+      res.status(202).json(await service.enqueueRepoSyncById(parseId(req.params['id'])));
+    }),
+  );
+
+  router.get(
+    '/sync-jobs/:jobId',
+    asyncHandler(async (req, res) => {
+      const jobId = req.params['jobId'];
+      if (!jobId || Array.isArray(jobId)) {
+        throw new HttpError(400, 'invalid job id');
+      }
+      res.json(await service.getRepoSyncJob(jobId));
     }),
   );
 

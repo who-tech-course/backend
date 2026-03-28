@@ -75,6 +75,7 @@ export function createSyncService(deps: {
     },
     workspaceRegex: RegExp,
     cohortRules: CohortRule[],
+    onProgress?: (step: { total: number; processed: number; synced: number; percent: number; phase: string }) => void,
   ): Promise<{ synced: number; failures: { prNumber: number; prUrl: string; error: string }[] }> => {
     const isCommonMission = repo.track === null || repo.track === undefined;
     const since = repo.lastSyncAt ?? undefined;
@@ -92,12 +93,16 @@ export function createSyncService(deps: {
       cohortRules,
       parseCohortRegexRules(repo.cohortRegexRules),
     );
+    const total = submissions.length;
     const profileCache = new Map<
       string,
       { githubUserId: number | null; githubId: string; blog: string | null; avatarUrl: string | null }
     >();
     let synced = 0;
+    let processed = 0;
     const failures: { prNumber: number; prUrl: string; error: string }[] = [];
+
+    onProgress?.({ total, processed, synced, percent: total === 0 ? 100 : 0, phase: 'PR 파싱 완료' });
 
     for (const s of submissions) {
       try {
@@ -211,10 +216,20 @@ export function createSyncService(deps: {
           prUrl: s.prUrl,
           error: err instanceof Error ? err.message : String(err),
         });
+      } finally {
+        processed++;
+        onProgress?.({
+          total,
+          processed,
+          synced,
+          percent: total === 0 ? 100 : Math.round((processed / total) * 100),
+          phase: 'PR 처리 중',
+        });
       }
     }
 
     await missionRepoRepo.touch(repo.id);
+    onProgress?.({ total, processed, synced, percent: 100, phase: '완료' });
     return { synced, failures };
   };
 
