@@ -1,6 +1,7 @@
 import express from 'express';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { existsSync } from 'fs';
 import { PrismaClient } from '@prisma/client';
 import { adminAuth } from './shared/middleware/auth.js';
 import { errorHandler } from './shared/middleware/error.js';
@@ -38,6 +39,9 @@ import { createMemberPublicService } from './features/member/member.public.servi
 import { createMemberPublicRouter } from './features/member/member.public.route.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const publicDir = existsSync(join(__dirname, 'public'))
+  ? join(__dirname, 'public')
+  : join(process.cwd(), 'src', 'public');
 
 // --- Composition Root ---
 const db = new PrismaClient();
@@ -71,7 +75,7 @@ const syncAdminService = createSyncAdminService({
 // --- Express App ---
 const app = express();
 app.use(express.json());
-app.use('/admin/ui', express.static(join(__dirname, 'public')));
+app.use('/admin/ui', express.static(publicDir));
 
 app.get('/', (_req, res) => {
   res.json({ message: 'who.tech API' });
