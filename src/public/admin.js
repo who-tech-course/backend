@@ -854,14 +854,14 @@ function renderMembers() {
     <tr>
       <td>
         <div class="stack inline">
-          <a href="${member.githubUserId ? `https://api.github.com/user/${member.githubUserId}` : `https://github.com/${member.githubId}`}" target="_blank" style="display:block">
+          <a href="https://github.com/${member.githubId}" target="_blank" style="display:block">
             ${member.avatarUrl
               ? `<img class="avatar" src="${member.avatarUrl}" alt="${escapeHtml(member.githubId)} avatar" />`
               : `<span class="avatar-fallback">${escapeHtml((member.githubId ?? '?').slice(0, 2).toUpperCase())}</span>`}
           </a>
           <div class="stack">
             <strong>${escapeHtml(member.githubId)}</strong>
-            <a class="link" href="${member.githubUserId ? `https://api.github.com/user/${member.githubUserId}` : `https://github.com/${member.githubId}`}" target="_blank">GitHub${member.githubUserId ? ` #${member.githubUserId}` : ''}</a>
+            <a class="link" href="https://github.com/${member.githubId}" target="_blank">GitHub${member.githubUserId ? ` #${member.githubUserId}` : ''}</a>
           </div>
         </div>
       </td>
