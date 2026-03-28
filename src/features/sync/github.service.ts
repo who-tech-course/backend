@@ -93,16 +93,29 @@ export async function fetchRepoPRs(
 
 export async function fetchUserProfile(
   octokit: Octokit,
-  username: string,
-): Promise<{ blog: string | null; avatarUrl: string | null }> {
-  const { data } = await octokit.users.getByUsername({ username });
+  input: { username?: string; githubUserId?: number | null },
+): Promise<{ githubUserId: number | null; githubId: string; blog: string | null; avatarUrl: string | null }> {
+  let data;
+
+  if (input.githubUserId != null) {
+    const response = await octokit.request('GET /user/{account_id}', { account_id: input.githubUserId });
+    data = response.data;
+  } else if (input.username) {
+    const response = await octokit.users.getByUsername({ username: input.username });
+    data = response.data;
+  } else {
+    throw new Error('username or githubUserId required');
+  }
+
   return {
+    githubUserId: data.id ?? input.githubUserId ?? null,
+    githubId: data.login,
     blog: normalizeBlogUrl(data.blog),
     avatarUrl: data.avatar_url ?? null,
   };
 }
 
 export async function fetchUserBlogUrl(octokit: Octokit, username: string): Promise<string | null> {
-  const { blog } = await fetchUserProfile(octokit, username);
+  const { blog } = await fetchUserProfile(octokit, { username });
   return blog;
 }

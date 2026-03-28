@@ -15,6 +15,7 @@ export interface NicknameStat {
 }
 
 export interface ParsedSubmission {
+  githubUserId: number | null;
   githubId: string;
   nickname: string;
   prNumber: number;

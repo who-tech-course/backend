@@ -4,6 +4,7 @@ import type { MissionRepoRepository } from '../../db/repositories/mission-repo.r
 import type { SubmissionRepository } from '../../db/repositories/submission.repository.js';
 import type { WorkspaceRepository } from '../../db/repositories/workspace.repository.js';
 import { findNicknameRegexByCohort, parseCohortRegexRules, parseCohorts } from '../../shared/cohort-regex.js';
+import { mergePreviousGithubIds, shouldRefreshProfile } from '../../shared/github-profile.js';
 import { HttpError } from '../../shared/http.js';
 import { mergeNicknameStat, resolveDisplayNickname } from '../../shared/nickname.js';
 import { fetchRepoPRs, fetchUserProfile, parseNickname, detectCohort } from './github.service.js';
@@ -13,7 +14,7 @@ type RawPR = {
   number: number;
   html_url: string;
   title: string;
-  user: { login: string } | null;
+  user: { login: string; id?: number } | null;
   base: { ref: string };
   created_at: string;
 };
@@ -38,6 +39,7 @@ export function parsePRsToSubmissions(
     if (!nickname) continue;
 
     results.push({
+      githubUserId: pr.user.id ?? null,
       githubId: pr.user.login,
       nickname,
       prNumber: pr.number,
@@ -90,13 +92,18 @@ export function createSyncService(deps: {
       cohortRules,
       parseCohortRegexRules(repo.cohortRegexRules),
     );
-    const profileCache = new Map<string, { blog: string | null; avatarUrl: string | null }>();
+    const profileCache = new Map<
+      string,
+      { githubUserId: number | null; githubId: string; blog: string | null; avatarUrl: string | null }
+    >();
     let synced = 0;
     const failures: { prNumber: number; prUrl: string; error: string }[] = [];
 
     for (const s of submissions) {
       try {
-        const existingMember = await memberRepo.findByGithubId(s.githubId, workspaceId);
+        const existingMember =
+          (s.githubUserId != null ? await memberRepo.findByGithubUserId(s.githubUserId, workspaceId) : null) ??
+          (await memberRepo.findByGithubId(s.githubId, workspaceId));
 
         // 공통 미션: 이미 알려진 멤버에만 submission 연결
         if (isCommonMission && !existingMember) continue;
@@ -110,45 +117,79 @@ export function createSyncService(deps: {
 
         let blog = existingMember?.blog ?? null;
         let avatarUrl = existingMember?.avatarUrl ?? null;
-        if (!blog) {
-          if (!profileCache.has(s.githubId)) {
-            profileCache.set(
-              s.githubId,
-              await fetchUserProfile(octokit, s.githubId).catch(() => ({ blog: null, avatarUrl: null })),
-            );
+        let githubId = s.githubId;
+        let githubUserId = s.githubUserId ?? existingMember?.githubUserId ?? null;
+        let profileFetchedAt = existingMember?.profileFetchedAt ?? null;
+        let profileRefreshError: string | null = existingMember?.profileRefreshError ?? null;
+
+        if (
+          !existingMember?.blog ||
+          !existingMember?.avatarUrl ||
+          shouldRefreshProfile(existingMember?.profileFetchedAt)
+        ) {
+          const cacheKey = githubUserId != null ? `id:${githubUserId}` : `login:${s.githubId}`;
+          if (!profileCache.has(cacheKey)) {
+            try {
+              profileCache.set(cacheKey, await fetchUserProfile(octokit, { githubUserId, username: s.githubId }));
+              profileRefreshError = null;
+            } catch (error) {
+              profileRefreshError = error instanceof Error ? error.message : String(error);
+              profileCache.set(cacheKey, {
+                githubUserId,
+                githubId: s.githubId,
+                blog: null,
+                avatarUrl: null,
+              });
+            }
           }
-          const profile = profileCache.get(s.githubId) ?? { blog: null, avatarUrl: null };
-          blog = profile.blog;
-          avatarUrl = profile.avatarUrl;
-        } else if (!avatarUrl) {
-          if (!profileCache.has(s.githubId)) {
-            profileCache.set(
-              s.githubId,
-              await fetchUserProfile(octokit, s.githubId).catch(() => ({ blog: null, avatarUrl: null })),
-            );
+          const profile = profileCache.get(cacheKey) ?? {
+            githubUserId,
+            githubId: s.githubId,
+            blog: null,
+            avatarUrl: null,
+          };
+          githubId = profile.githubId;
+          githubUserId = profile.githubUserId ?? githubUserId;
+          blog = existingMember?.blog ?? profile.blog;
+          avatarUrl = profile.avatarUrl ?? existingMember?.avatarUrl ?? null;
+          profileFetchedAt = new Date();
+          if (profile.avatarUrl || profile.blog || profile.githubId !== s.githubId) {
+            profileRefreshError = null;
           }
-          avatarUrl = profileCache.get(s.githubId)?.avatarUrl ?? null;
         }
 
-        const member = await memberRepo.upsert({
-          where: { githubId_workspaceId: { githubId: s.githubId, workspaceId } },
-          create: {
-            githubId: s.githubId,
-            nickname: displayNickname,
-            cohort: s.cohort,
-            avatarUrl,
-            blog,
-            nicknameStats: JSON.stringify(nicknameStats),
-            workspaceId,
-          },
-          update: {
-            nickname: displayNickname,
-            cohort: s.cohort,
-            ...(existingMember?.avatarUrl ? {} : { avatarUrl }),
-            ...(existingMember?.blog ? {} : { blog }),
-            nicknameStats: JSON.stringify(nicknameStats),
-          },
-        });
+        const previousGithubIds = mergePreviousGithubIds(
+          existingMember?.previousGithubIds,
+          existingMember?.githubId,
+          githubId,
+        );
+
+        const member = existingMember
+          ? await memberRepo.update(existingMember.id, {
+              githubId,
+              githubUserId,
+              previousGithubIds,
+              nickname: displayNickname,
+              cohort: s.cohort,
+              avatarUrl,
+              ...(existingMember?.blog ? {} : { blog }),
+              nicknameStats: JSON.stringify(nicknameStats),
+              profileFetchedAt,
+              profileRefreshError,
+            })
+          : await memberRepo.create({
+              githubId,
+              githubUserId,
+              previousGithubIds,
+              nickname: displayNickname,
+              cohort: s.cohort,
+              avatarUrl,
+              blog,
+              nicknameStats: JSON.stringify(nicknameStats),
+              profileFetchedAt,
+              profileRefreshError,
+              workspaceId,
+            });
 
         await submissionRepo.upsert({
           where: { prNumber_missionRepoId: { prNumber: s.prNumber, missionRepoId: repo.id } },

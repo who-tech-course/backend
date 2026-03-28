@@ -24,17 +24,22 @@ model Workspace {
 
 model Member {
   id             Int          @id @default(autoincrement())
+  githubUserId   Int?
   githubId       String
+  previousGithubIds String?   // JSON: ["old-login", ...]
   nickname       String?
   manualNickname String?
   nicknameStats  String?      // JSON: [{"nickname":"...", "count":2, "lastSeenAt":"..."}]
   avatarUrl      String?
+  profileFetchedAt DateTime?
+  profileRefreshError String?
   cohort         Int?
   blog           String?
   rssStatus      String       @default("unknown") // unknown | available | unavailable | error
   rssUrl         String?
   rssCheckedAt   DateTime?
   rssError       String?
+  lastPostedAt   DateTime?    // RSS에서 수집한 가장 최근 글의 publishedAt
   roles          String       @default("[\"crew\"]") // JSON: ["crew"] | ["coach"] | ["crew","reviewer"] 등
   workspaceId    Int
   workspace   Workspace    @relation(fields: [workspaceId], references: [id])
@@ -45,6 +50,7 @@ model Member {
   updatedAt   DateTime     @updatedAt
 
   @@unique([githubId, workspaceId])
+  @@unique([githubUserId, workspaceId])
 }
 
 model MissionRepo {

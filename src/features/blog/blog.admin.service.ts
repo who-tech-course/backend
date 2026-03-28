@@ -3,6 +3,7 @@ import type { MemberRepository } from '../../db/repositories/member.repository.j
 import type { WorkspaceService } from '../workspace/workspace.service.js';
 import type { BlogService } from './blog.service.js';
 import { fetchUserProfile } from '../sync/github.service.js';
+import { mergePreviousGithubIds } from '../../shared/github-profile.js';
 
 export function createBlogAdminService(deps: {
   memberRepo: MemberRepository;
@@ -27,7 +28,7 @@ export function createBlogAdminService(deps: {
         where: { workspaceId: workspace.id, blog: null, ...(cohort != null ? { cohort } : {}) },
         orderBy: [{ submissions: { _count: 'desc' } }, { id: 'asc' }],
         take: limit,
-        select: { id: true, githubId: true, nickname: true },
+        select: { id: true, githubId: true, githubUserId: true, nickname: true, previousGithubIds: true },
       });
 
       let updated = 0;
@@ -36,14 +37,22 @@ export function createBlogAdminService(deps: {
 
       for (const member of members) {
         try {
-          const profile = await fetchUserProfile(octokit, member.githubId);
+          const profile = await fetchUserProfile(octokit, {
+            githubUserId: member.githubUserId,
+            username: member.githubId,
+          });
           if (!profile.blog && !profile.avatarUrl) {
             missing++;
             continue;
           }
           await memberRepo.patch(member.id, {
+            githubId: profile.githubId,
+            githubUserId: profile.githubUserId,
+            previousGithubIds: mergePreviousGithubIds(member.previousGithubIds, member.githubId, profile.githubId),
             blog: profile.blog,
             avatarUrl: profile.avatarUrl,
+            profileFetchedAt: new Date(),
+            profileRefreshError: null,
             rssStatus: 'unknown',
             rssUrl: null,
             rssCheckedAt: null,

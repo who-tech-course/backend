@@ -13,17 +13,22 @@ CREATE TABLE "Workspace" (
 -- CreateTable
 CREATE TABLE "Member" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "githubUserId" INTEGER,
     "githubId" TEXT NOT NULL,
+    "previousGithubIds" TEXT,
     "nickname" TEXT,
     "manualNickname" TEXT,
     "nicknameStats" TEXT,
     "avatarUrl" TEXT,
+    "profileFetchedAt" DATETIME,
+    "profileRefreshError" TEXT,
     "cohort" INTEGER,
     "blog" TEXT,
     "rssStatus" TEXT NOT NULL DEFAULT 'unknown',
     "rssUrl" TEXT,
     "rssCheckedAt" DATETIME,
     "rssError" TEXT,
+    "lastPostedAt" DATETIME,
     "roles" TEXT NOT NULL DEFAULT '["crew"]',
     "workspaceId" INTEGER NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -115,6 +120,9 @@ CREATE UNIQUE INDEX "Workspace_name_key" ON "Workspace"("name");
 CREATE UNIQUE INDEX "Member_githubId_workspaceId_key" ON "Member"("githubId", "workspaceId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "Member_githubUserId_workspaceId_key" ON "Member"("githubUserId", "workspaceId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "MissionRepo_githubRepoId_key" ON "MissionRepo"("githubRepoId");
 
 -- CreateIndex
@@ -131,4 +139,3 @@ CREATE UNIQUE INDEX "BlogPost_url_key" ON "BlogPost"("url");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "BlogPostLatest_url_key" ON "BlogPostLatest"("url");
-
