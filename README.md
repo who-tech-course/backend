@@ -87,31 +87,57 @@ npm run dev       # tsx watch로 핫리로드
 
 ### DB / Migration
 
-- baseline migration 1개로 관리합니다.
-  - `prisma/migrations/20260328190000_baseline/` — 현재 전체 스키마 기준선
-- 로컬 DB를 새로 만들 때는 아래 순서를 권장합니다.
+- 원칙: **`schema.prisma`가 진실**이고, `prisma/migrations/`는 그에 맞춘 **재생 가능한 히스토리**입니다.
+- 지금은 baseline 1개로 두고 있으며, 폴더명은 `prisma/migrations/<타임스탬프>_<이름>/migration.sql` 형식입니다.
+
+로컬에서 DB만 갈아끼우고 기존 마이그레이션을 그대로 쓸 때:
 
 ```bash
 rm -f prisma/dev.db prisma/prisma/dev.db
 npx prisma migrate deploy
-node --import tsx src/db/seed.ts
+npm run seed
 ```
 
-- `seed`는 `workspace`만 생성합니다.
-- 미션 레포는 어드민의 `후보 불러오기`로 다시 수집합니다.
+### 스키마를 재조정한 뒤 마이그레이션을 “처음부터” 다시 만들고 싶을 때
+
+배포·공유 저장소 기준으로 가장 단순한 흐름입니다. **이미 적용된 마이그레이션 SQL을 뒤집어쓰면** Prisma checksum이 어긋나므로, 팀/서버는 **SQLite 파일 삭제 후 새 마이그레이션만 적용**한다고 가정합니다.
+
+1. **`schema.prisma` 수정을 끝낸다.**
+2. **기존 마이그레이션 폴더를 제거한다.**  
+   `prisma/migrations/migration_lock.toml` 은 그대로 두고, 그 안의 `20*` 같은 **이전 migration 디렉터리만 삭제**한다.
+3. **로컬에서 첫 마이그레이션을 다시 만든다.**
+
+   ```bash
+   rm -f prisma/dev.db prisma/prisma/dev.db
+   npx prisma migrate dev --name init
+   ```
+
+   생성된 `prisma/migrations/*_init/`(이름은 자유)의 `migration.sql`을 검수한 뒤 커밋한다.
+   - 대안: `npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script` 로 SQL을 뽑은 뒤, **동일 규칙의 폴더 이름**으로 `migration.sql`만 두는 방법도 있으나, 로컬에서 `migrate dev`로 생성·적용까지 한 번 검증하는 편이 안전하다.
+
+4. **서버(운영)**: 데이터를 버려도 된다면 SQLite 파일 삭제 후 배포 파이프라인과 동일하게 맞춘다.
+
+   ```bash
+   ssh oracle "cd ~/app/backend && git pull --ff-only origin develop && rm -f prisma/dev.db && npm install --ignore-scripts && npx prisma generate && npx prisma migrate deploy && npm run seed && npm run build && pm2 restart backend --update-env"
+   ```
+
+5. **멤버·레포**는 다시 어드민에서 discover / sync 로 채운다.
+
+`npm run seed`는 **Role(crew/coach/reviewer) upsert + Workspace(woowacourse)** 까지 수행합니다.
 
 ## 스크립트
 
-| 명령어              | 설명                  |
-| ------------------- | --------------------- |
-| `npm run dev`       | 개발 서버 (tsx watch) |
-| `npm run build`     | TypeScript 빌드       |
-| `npm run start`     | 빌드 결과 실행        |
-| `npm run lint`      | ESLint 검사           |
-| `npm run lint:fix`  | ESLint 자동 수정      |
-| `npm run format`    | Prettier 포맷         |
-| `npm run test:unit` | 단위 테스트           |
-| `npm run seed`      | workspace seed        |
+| 명령어               | 설명                            |
+| -------------------- | ------------------------------- |
+| `npm run dev`        | 개발 서버 (tsx watch)           |
+| `npm run build`      | TypeScript 빌드                 |
+| `npm run start`      | 빌드 결과 실행                  |
+| `npm run lint`       | ESLint 검사                     |
+| `npm run lint:fix`   | ESLint 자동 수정                |
+| `npm run format`     | Prettier 포맷                   |
+| `npm run test:unit`  | 단위 테스트                     |
+| `npm run seed`       | Role + Workspace 시드           |
+| `npm run seed:roles` | Role만 upsert (`seed`에 포함됨) |
 
 ## 코드 컨벤션
 

@@ -21,6 +21,8 @@ npx prisma migrate dev   # 마이그레이션 생성 + 적용
 npx prisma migrate deploy # 프로덕션 마이그레이션 적용
 npm run seed             # Role + Workspace (미션 레포는 어드민 discover/sync)
 
+# 스키마 대개편 후 마이그레이션 폴더를 비우고 다시 만들기 → README「스키마를 재조정한 뒤…」절차 참고
+
 # 테스트
 npm run test:unit        # 유닛 테스트 (CI에서 실행)
 npm run test:integration # 통합 테스트 (로컬, DB 필요)
