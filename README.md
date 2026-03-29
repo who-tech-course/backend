@@ -158,10 +158,26 @@ chore/설명
 
 ```bash
 git push origin develop
-ssh oracle "cd ~/app/backend && git pull --ff-only origin develop && npm install --ignore-scripts && npx prisma generate && npm run build && pm2 restart backend --update-env"
+ssh oracle "cd ~/app/backend && git pull --ff-only origin develop && npm install --ignore-scripts && npx prisma generate && npx prisma migrate deploy && npm run build && pm2 restart backend --update-env"
 ```
 
-- `.github/workflows/deploy.yml`에는 `npx prisma migrate deploy`가 포함되어 있습니다. **운영 DB가 마이그레이션 baseline 이전에 만들어진 경우** `P3005`(스키마가 비어 있지 않음)로 단계가 실패할 수 있습니다. 그때는 서버에서 위 **수동 배포**처럼 `migrate deploy` 없이 `build`·PM2 재시작만 하면, **이번처럼 Prisma 스키마 변경이 없는 배포**는 정상 반영됩니다. 스키마를 바꾼 뒤에는 [baseline 가이드](https://www.prisma.io/docs/guides/migrate/production-troubleshooting)로 DB와 마이그레이션 이력을 맞춘 다음 `migrate deploy`를 다시 켜는 것이 좋습니다.
+GitHub Actions(`deploy.yml`)도 위와 같이 **`migrate deploy` → `build` → PM2 재시작** 순서입니다.
+
+### 운영 DB를 비우고 맞추기 (스키마 drift / P3005 / 어드민 멤버 오류 등)
+
+baseline SQL이 `schema.prisma`와 어긋난 적이 있어, **SQLite 파일을 지우고 다시 적용**하는 것이 가장 확실합니다. (`DATABASE_URL` 기본값: `file:./prisma/dev.db`)
+
+```bash
+ssh oracle "cd ~/app/backend && git pull --ff-only origin develop && rm -f prisma/dev.db && npm install --ignore-scripts && npx prisma generate && npx prisma migrate deploy && npm run seed && npm run build && pm2 restart backend --update-env"
+```
+
+- **`npm run seed`**: `Role`(crew/coach/reviewer) + `Workspace`까지 채웁니다. 멤버·레포는 어드민에서 sync/discover로 다시 채웁니다.
+
+### 아키텍처 메모 (기능 중심 + 엔티티 클래스)
+
+- **지금 구조**: `features/*` 단위로 `*.route.ts`(HTTP) → `*.service.ts`(유스케이스) → `db/repositories/*.ts`(Prisma) 가 이미 **경계**를 나눕니다. Prisma 모델이 DB·생성 클라이언트의 **사실상 스키마**이고, API 응답은 service에서 객체 리터럴/`shared/types`로 맞춥니다.
+- **도메인 엔티티 클래스**를 굳이 두지 않아도 됩니다. 복잡한 불변 규칙·행동이 생기면 해당 feature service 안의 **순수 함수/소형 타입**부터 두고, 여러 feature에서 공유되면 `shared/`로 올리는 편이 이 코드베이스와 잘 맞습니다.
+- **언제 클래스를 고려할까**: 동일 식별자로 여러 집계를 캡슐화해야 하거나, 저장소와 무관한 규칙 검증이 매우 많아질 때 등. 현재 규모에서는 **추가 레이어는 부담만 늘리는 경우가 많습니다.**
 
 ### PM2 명령어
 
@@ -200,6 +216,7 @@ ssh oracle "pm2 restart backend" # 재시작
 
 - `MissionRepo.tabCategory` — `base | common | excluded | precourse`
 - `MissionRepo.status` — `active | candidate | excluded`
+- `Cohort` / `Role` / `MemberCohort` — 멤버의 기수·역할(crew/coach/reviewer)은 정규화 테이블로 저장 (`npm run seed`가 역할 행 생성)
 - `Member.githubUserId` — GitHub login 변경에도 유지되는 내부 식별자
 - `Member.previousGithubIds` — 과거 GitHub login 이력 JSON
 - `Member.avatarUrl` — GitHub profile의 `avatar_url` 저장 (파일 저장 아님)

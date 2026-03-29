@@ -1,3 +1,4 @@
+-- Baseline aligned with prisma/schema.prisma (MemberCohort / Cohort / Role).
 -- CreateTable
 CREATE TABLE "Workspace" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
@@ -22,18 +23,40 @@ CREATE TABLE "Member" (
     "avatarUrl" TEXT,
     "profileFetchedAt" DATETIME,
     "profileRefreshError" TEXT,
-    "cohort" INTEGER,
     "blog" TEXT,
     "rssStatus" TEXT NOT NULL DEFAULT 'unknown',
     "rssUrl" TEXT,
     "rssCheckedAt" DATETIME,
     "rssError" TEXT,
     "lastPostedAt" DATETIME,
-    "roles" TEXT NOT NULL DEFAULT '["crew"]',
     "workspaceId" INTEGER NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "Member_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "Cohort" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "number" INTEGER NOT NULL,
+    "description" TEXT
+);
+
+-- CreateTable
+CREATE TABLE "Role" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "name" TEXT NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "MemberCohort" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "memberId" INTEGER NOT NULL,
+    "cohortId" INTEGER NOT NULL,
+    "roleId" INTEGER NOT NULL,
+    CONSTRAINT "MemberCohort_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "Role" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "MemberCohort_cohortId_fkey" FOREIGN KEY ("cohortId") REFERENCES "Cohort" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "MemberCohort_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "Member" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -65,8 +88,8 @@ CREATE TABLE "CohortRepo" (
     "order" INTEGER NOT NULL DEFAULT 0,
     "missionRepoId" INTEGER NOT NULL,
     "workspaceId" INTEGER NOT NULL,
-    CONSTRAINT "CohortRepo_missionRepoId_fkey" FOREIGN KEY ("missionRepoId") REFERENCES "MissionRepo" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT "CohortRepo_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    CONSTRAINT "CohortRepo_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "CohortRepo_missionRepoId_fkey" FOREIGN KEY ("missionRepoId") REFERENCES "MissionRepo" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -78,8 +101,8 @@ CREATE TABLE "Submission" (
     "submittedAt" DATETIME NOT NULL,
     "memberId" INTEGER NOT NULL,
     "missionRepoId" INTEGER NOT NULL,
-    CONSTRAINT "Submission_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "Member" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT "Submission_missionRepoId_fkey" FOREIGN KEY ("missionRepoId") REFERENCES "MissionRepo" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    CONSTRAINT "Submission_missionRepoId_fkey" FOREIGN KEY ("missionRepoId") REFERENCES "MissionRepo" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "Submission_memberId_fkey" FOREIGN KEY ("memberId") REFERENCES "Member" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -121,6 +144,15 @@ CREATE UNIQUE INDEX "Member_githubId_workspaceId_key" ON "Member"("githubId", "w
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Member_githubUserId_workspaceId_key" ON "Member"("githubUserId", "workspaceId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Cohort_number_key" ON "Cohort"("number");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Role_name_key" ON "Role"("name");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "MemberCohort_memberId_cohortId_roleId_key" ON "MemberCohort"("memberId", "cohortId", "roleId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "MissionRepo_githubRepoId_key" ON "MissionRepo"("githubRepoId");

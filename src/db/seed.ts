@@ -1,10 +1,23 @@
 import prisma from './prisma.js';
 
+async function seedRoles() {
+  const roles = ['crew', 'coach', 'reviewer'];
+  for (const name of roles) {
+    await prisma.role.upsert({
+      where: { name },
+      update: {},
+      create: { name },
+    });
+  }
+}
+
 async function seed() {
+  await seedRoles();
+
   const existing = await prisma.workspace.findUnique({ where: { name: 'woowacourse' } });
 
   if (existing) {
-    console.log('workspace already exists, skipping seed');
+    console.log('workspace already exists, skipping workspace seed');
     return;
   }
 

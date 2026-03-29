@@ -17,7 +17,8 @@
     "test:integration": "NODE_OPTIONS=--experimental-vm-modules jest __tests__/integration",
     "test:watch": "NODE_OPTIONS=--experimental-vm-modules jest --watch",
     "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage",
-    "seed": "tsx src/db/seed.ts"
+    "seed": "tsx src/db/seed.ts",
+    "seed:roles": "tsx src/scripts/seed-roles.ts"
   },
   "dependencies": {
     "@octokit/plugin-throttling": "^11.0.3",

@@ -19,7 +19,7 @@ npm run dev              # tsx watch 핫리로드
 # DB
 npx prisma migrate dev   # 마이그레이션 생성 + 적용
 npx prisma migrate deploy # 프로덕션 마이그레이션 적용
-npm run seed             # 초기 데이터 (workspace + 50개 레포)
+npm run seed             # Role + Workspace (미션 레포는 어드민 discover/sync)
 
 # 테스트
 npm run test:unit        # 유닛 테스트 (CI에서 실행)
@@ -47,13 +47,16 @@ MissionRepo (DB 등록) → fetchRepoPRs (GitHub API) → parsePRsToSubmissions 
 ### DB 스키마 핵심
 
 - `Workspace`: githubOrg, nicknameRegex(기본값), cohortRules(JSON), blogSyncEnabled(bool)
-- `MissionRepo`: track(frontend|backend|android|**null=공통**), type(individual|integration), status(active|candidate|excluded), syncMode(continuous|once), lastSyncAt, nicknameRegex(선택), cohortRegexRules(JSON), cohorts(JSON 기수배열 e.g. `[7,8]` — sync 필터용), level(Int? 1~4)
-- `CohortRepo`: cohort, order, missionRepoId, workspaceId — 아카이브 생성용 기수별 레포 순서 (수동 관리)
-- `Member`: githubId, nickname, manualNickname, nicknameStats(JSON), avatarUrl, cohort, blog, rssStatus(unknown|available|unavailable|error), rssUrl, rssCheckedAt, rssError, lastPostedAt(RSS에서 수집한 가장 최근 글 날짜), roles(JSON 배열 e.g. `["crew","reviewer"]`)
-- `MissionRepo`: name, repoUrl, track(nullable), type, tabCategory(base|common|excluded|precourse), status(active|candidate|excluded), syncMode(continuous|once), lastSyncAt, nicknameRegex, cohortRegexRules(JSON), cohorts(JSON 기수배열), level(Int? 1~4)
-- `Submission`: prNumber, prUrl, title, submittedAt, memberId, missionRepoId
-- `BlogPost`: url, title, publishedAt, memberId (30일 보관)
-- `BlogPostLatest`: url, title, publishedAt, memberId (7일 스냅샷, sync마다 전체 갱신)
+- `MissionRepo`: name, repoUrl, track(frontend|backend|android|**null=공통**), type(individual|integration), tabCategory, status(active|candidate|excluded), syncMode(continuous|once), lastSyncAt, nicknameRegex, cohortRegexRules(JSON), cohorts(JSON 기수배열), level(Int?)
+- `CohortRepo`: cohort, order, missionRepoId, workspaceId — 기수별 미션 순서
+- `Member`: githubId, githubUserId?, previousGithubIds?, 닉네임 필드, avatarUrl, blog, rss\*, lastPostedAt 등 — **기수/역할은 `MemberCohort`로 정규화**
+- `Cohort` / `Role` / `MemberCohort`: 기수 번호, 역할 이름(crew|coach|reviewer), 멤버↔기수↔역할 연결 (`npm run seed`가 Role + Workspace까지 생성)
+- `Submission`, `BlogPost`, `BlogPostLatest`, `ActivityLog`: 기존과 동일
+
+### 레이어링 (도메인 엔티티 클래스)
+
+- `feature.route` → `feature.service` → `db/repository`(Prisma) + `shared/*` 유틸 로 충분한 편이며, **별도의 엔티티 클래스 레이어는 필수 아님**. Prisma 모델 + 서비스 단의 응답 shaping으로 API 계약을 맞춘다.
+- 규칙이 복잡해지면 service 내부 순수 함수나 소형 타입부터 도입하고, 여러 feature에서 쓰이면 `shared/`로 승격한다.
 
 ### API 구조
 
@@ -116,7 +119,7 @@ GET  /members/:githubId           — 멤버 상세 → {githubId, nickname, ava
 ## GitHub Actions
 
 - `test.yml` — PR 시 unit 테스트 (develop/main 대상)
-- `deploy.yml` — develop 푸시 시 SSH 자동 배포 (`git checkout -- .` → pull → npm install → prisma migrate → pm2 restart)
+- `deploy.yml` — develop 푸시 시 SSH 자동 배포 (`git checkout -- .` → pull → npm install → prisma generate → migrate deploy → **npm run build** → pm2 restart)
 - `sync.yml` — `workflow_dispatch` 수동 트리거 전용 (cron 없음)
   - Secrets 필요: `SYNC_URL` (서버 URL), `ADMIN_SECRET`
 - `blog-check.yml` — 매시간 cron `POST /admin/blog/sync` 호출 (GitHub API 미사용, RSS only)
