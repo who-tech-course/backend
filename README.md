@@ -158,8 +158,10 @@ chore/설명
 
 ```bash
 git push origin develop
-ssh oracle "cd ~/app/backend && git pull --ff-only origin develop && npm run build && pm2 restart backend --update-env"
+ssh oracle "cd ~/app/backend && git pull --ff-only origin develop && npm install --ignore-scripts && npx prisma generate && npm run build && pm2 restart backend --update-env"
 ```
+
+- `.github/workflows/deploy.yml`에는 `npx prisma migrate deploy`가 포함되어 있습니다. **운영 DB가 마이그레이션 baseline 이전에 만들어진 경우** `P3005`(스키마가 비어 있지 않음)로 단계가 실패할 수 있습니다. 그때는 서버에서 위 **수동 배포**처럼 `migrate deploy` 없이 `build`·PM2 재시작만 하면, **이번처럼 Prisma 스키마 변경이 없는 배포**는 정상 반영됩니다. 스키마를 바꾼 뒤에는 [baseline 가이드](https://www.prisma.io/docs/guides/migrate/production-troubleshooting)로 DB와 마이그레이션 이력을 맞춘 다음 `migrate deploy`를 다시 켜는 것이 좋습니다.
 
 ### PM2 명령어
 
