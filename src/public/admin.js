@@ -32,12 +32,17 @@ function tryAutoLogin() {
   if (!token) return;
   fetch('/admin/status', { headers: authHeaders() })
     .then((response) => {
-      if (!response.ok) { localStorage.removeItem('admin_token'); return; }
+      if (!response.ok) {
+        localStorage.removeItem('admin_token');
+        return;
+      }
       document.getElementById('login').style.display = 'none';
       document.getElementById('main').style.display = 'block';
       return Promise.all([loadStatus(), loadWorkspace(), loadRepos(), loadMembers(), loadActivityLogs()]);
     })
-    .catch(() => { localStorage.removeItem('admin_token'); });
+    .catch(() => {
+      localStorage.removeItem('admin_token');
+    });
 }
 
 function authHeaders(contentType) {
@@ -52,11 +57,13 @@ function parseErrorResponse(response) {
   return response
     .json()
     .catch(() => ({}))
-    .then((body) => Promise.reject({
-      status: response.status,
-      message: body?.message ?? response.statusText ?? 'request failed',
-      ...body,
-    }));
+    .then((body) =>
+      Promise.reject({
+        status: response.status,
+        message: body?.message ?? response.statusText ?? 'request failed',
+        ...body,
+      }),
+    );
 }
 
 function loadStatus() {
@@ -158,7 +165,10 @@ function patchRepo(id, data) {
     headers: authHeaders('application/json'),
     body: JSON.stringify(data),
   })
-    .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
+    .then((r) => {
+      if (!r.ok) throw new Error();
+      return r.json();
+    })
     .then((updated) => {
       const idx = repoList.findIndex((r) => r.id === id);
       if (idx !== -1) repoList[idx] = { ...repoList[idx], ...updated };
@@ -183,7 +193,11 @@ function moveRepoCategory(id, target) {
   }
 
   if (target === 'common') {
-    patchRepo(id, { tabCategory: 'common', status: repo.status === 'excluded' ? 'candidate' : repo.status, track: null });
+    patchRepo(id, {
+      tabCategory: 'common',
+      status: repo.status === 'excluded' ? 'candidate' : repo.status,
+      track: null,
+    });
     return;
   }
 
@@ -212,9 +226,22 @@ function inlineSelect(el, options, current, onSave) {
   sel.focus();
   let done = false;
   sel.onclick = (e) => e.stopPropagation();
-  sel.onchange = () => { done = true; onSave(sel.value || null); };
-  sel.onblur = () => { if (!done) { done = true; el.innerHTML = prev; } };
-  sel.onkeydown = (e) => { if (e.key === 'Escape') { done = true; el.innerHTML = prev; } };
+  sel.onchange = () => {
+    done = true;
+    onSave(sel.value || null);
+  };
+  sel.onblur = () => {
+    if (!done) {
+      done = true;
+      el.innerHTML = prev;
+    }
+  };
+  sel.onkeydown = (e) => {
+    if (e.key === 'Escape') {
+      done = true;
+      el.innerHTML = prev;
+    }
+  };
 }
 
 function inlineText(el, current, onSave, inputType = 'text') {
@@ -233,12 +260,18 @@ function inlineText(el, current, onSave, inputType = 'text') {
     if (done) return;
     done = true;
     const val = inp.value.trim();
-    if (val === String(current ?? '')) { el.innerHTML = prev; return; }
+    if (val === String(current ?? '')) {
+      el.innerHTML = prev;
+      return;
+    }
     onSave(val || null);
   };
   inp.onkeydown = (e) => {
     if (e.key === 'Enter') save();
-    if (e.key === 'Escape') { done = true; el.innerHTML = prev; }
+    if (e.key === 'Escape') {
+      done = true;
+      el.innerHTML = prev;
+    }
   };
   inp.onblur = save;
 }
@@ -246,31 +279,71 @@ function inlineText(el, current, onSave, inputType = 'text') {
 function inlineEditStatus(el, id) {
   const repo = repoList.find((r) => r.id === id);
   if (!repo) return;
-  inlineSelect(el, [{ value: 'active', label: 'active' }, { value: 'candidate', label: 'candidate' }, { value: 'excluded', label: 'excluded' }], repo.status, (val) => patchRepo(id, { status: val }));
+  inlineSelect(
+    el,
+    [
+      { value: 'active', label: 'active' },
+      { value: 'candidate', label: 'candidate' },
+      { value: 'excluded', label: 'excluded' },
+    ],
+    repo.status,
+    (val) => patchRepo(id, { status: val }),
+  );
 }
 
 function inlineEditSyncMode(el, id) {
   const repo = repoList.find((r) => r.id === id);
   if (!repo) return;
-  inlineSelect(el, [{ value: 'continuous', label: '계속' }, { value: 'once', label: '1회' }], repo.syncMode, (val) => patchRepo(id, { syncMode: val }));
+  inlineSelect(
+    el,
+    [
+      { value: 'continuous', label: '계속' },
+      { value: 'once', label: '1회' },
+    ],
+    repo.syncMode,
+    (val) => patchRepo(id, { syncMode: val }),
+  );
 }
 
 function inlineEditTrack(el, id) {
   const repo = repoList.find((r) => r.id === id);
   if (!repo) return;
-  inlineSelect(el, [{ value: null, label: '공통' }, { value: 'frontend', label: 'frontend' }, { value: 'backend', label: 'backend' }, { value: 'android', label: 'android' }], repo.track, (val) => patchRepo(id, { track: val }));
+  inlineSelect(
+    el,
+    [
+      { value: null, label: '공통' },
+      { value: 'frontend', label: 'frontend' },
+      { value: 'backend', label: 'backend' },
+      { value: 'android', label: 'android' },
+    ],
+    repo.track,
+    (val) => patchRepo(id, { track: val }),
+  );
 }
 
 function inlineEditType(el, id) {
   const repo = repoList.find((r) => r.id === id);
   if (!repo) return;
-  inlineSelect(el, [{ value: 'individual', label: 'individual' }, { value: 'integration', label: 'integration' }], repo.type, (val) => patchRepo(id, { type: val }));
+  inlineSelect(
+    el,
+    [
+      { value: 'individual', label: 'individual' },
+      { value: 'integration', label: 'integration' },
+    ],
+    repo.type,
+    (val) => patchRepo(id, { type: val }),
+  );
 }
 
 function inlineEditLevel(el, id) {
   const repo = repoList.find((r) => r.id === id);
   if (!repo) return;
-  inlineText(el, repo.level != null ? String(repo.level) : '', (val) => patchRepo(id, { level: val ? Number(val) : null }), 'number');
+  inlineText(
+    el,
+    repo.level != null ? String(repo.level) : '',
+    (val) => patchRepo(id, { level: val ? Number(val) : null }),
+    'number',
+  );
 }
 
 function updateRepoLevel(repoId, level) {
@@ -302,7 +375,12 @@ function inlineEditCohorts(el, id) {
   const repo = repoList.find((r) => r.id === id);
   if (!repo) return;
   inlineText(el, repo.cohorts?.join(', ') ?? '', (val) => {
-    const cohorts = val ? val.split(',').map((c) => Number(c.trim())).filter((n) => !isNaN(n) && n > 0) : null;
+    const cohorts = val
+      ? val
+          .split(',')
+          .map((c) => Number(c.trim()))
+          .filter((n) => !isNaN(n) && n > 0)
+      : null;
     patchRepo(id, { cohorts });
   });
 }
@@ -326,7 +404,7 @@ function repoRow(repo) {
     .map(({ key, label, disabled }) => {
       const active = currentCategory === key;
       const classes = `btn-sm tab-choice${active ? ' active' : ''}`;
-      const attrs = disabled && !active ? 'disabled' : `onclick="moveRepoCategory(${repo.id}, '${key}')"`; 
+      const attrs = disabled && !active ? 'disabled' : `onclick="moveRepoCategory(${repo.id}, '${key}')"`;
       return `<button class="${classes}" ${attrs}>${label}</button>`;
     })
     .join('');
@@ -423,9 +501,7 @@ function renderPagedRepos(tbodyId, paginationId, repos, page, onPageChange) {
   const safePage = Math.min(page, totalPages);
   const paged = repos.slice((safePage - 1) * REPO_PAGE_SIZE, safePage * REPO_PAGE_SIZE);
 
-  tbody.innerHTML = paged.length
-    ? paged.map(repoRow).join('')
-    : `<tr><td colspan="8" class="muted">없음</td></tr>`;
+  tbody.innerHTML = paged.length ? paged.map(repoRow).join('') : `<tr><td colspan="8" class="muted">없음</td></tr>`;
 
   if (totalPages <= 1) {
     paginationEl.innerHTML = '';
@@ -467,7 +543,10 @@ function discoverRepos() {
       addLog(`레포 후보 완료 — 분석 ${result.discovered}개, 신규 ${result.created}개, 갱신 ${result.updated}개`, 'ok');
       return loadRepos();
     })
-    .catch(() => { toast('후보 불러오기 실패'); addLog('레포 후보 불러오기 실패', 'err'); })
+    .catch(() => {
+      toast('후보 불러오기 실패');
+      addLog('레포 후보 불러오기 실패', 'err');
+    })
     .finally(() => {
       button.disabled = false;
       button.textContent = '후보 불러오기';
@@ -545,7 +624,6 @@ function editRepoRegex(id) {
   modal.style.display = 'flex';
 }
 
-
 function deleteAllRepos() {
   if (!confirm('모든 레포와 관련 submission을 삭제합니다. 계속할까요?')) return;
 
@@ -586,8 +664,7 @@ function pollRepoSyncJob(jobId, { name, button, defaultButtonText, doneLabel, do
         document.getElementById('sync-result').textContent = `${job.repoName} ${job.message}${progressText}`;
 
         if (job.status === 'queued' || job.status === 'running') {
-          button.textContent =
-            job.status === 'queued' ? '대기 중...' : `${Math.max(job.progress?.percent ?? 0, 1)}%`;
+          button.textContent = job.status === 'queued' ? '대기 중...' : `${Math.max(job.progress?.percent ?? 0, 1)}%`;
           setTimeout(poll, 2000);
           return;
         }
@@ -630,7 +707,6 @@ function pollRepoSyncJob(jobId, { name, button, defaultButtonText, doneLabel, do
   poll();
 }
 
-
 function syncRepo(id, button) {
   const repo = repoList.find((r) => r.id === id);
   const name = repo?.name ?? `#${id}`;
@@ -657,13 +733,18 @@ function syncRepo(id, button) {
       const detail = err?.message ?? String(err);
       toast('단건 sync 실패');
       addLog(`${name} sync 실패: ${detail}`, 'err');
-    })
+    });
 }
 
 function resetSync(id) {
   const repo = repoList.find((r) => r.id === id);
   const name = repo?.name ?? `#${id}`;
-  if (!confirm(`${name}의 동기화 상태를 초기화하시겠습니까? (저장된 제출물은 유지되지만 다음 Sync 시 모든 PR을 다시 훑습니다)`)) return;
+  if (
+    !confirm(
+      `${name}의 동기화 상태를 초기화하시겠습니까? (저장된 제출물은 유지되지만 다음 Sync 시 모든 PR을 다시 훑습니다)`,
+    )
+  )
+    return;
 
   fetch(`/admin/repos/${id}/reset-sync`, { method: 'POST', headers: authHeaders() })
     .then((response) => {
@@ -813,16 +894,23 @@ function triggerBlogBackfill() {
   fetch(`/admin/blog/backfill?limit=30${cohortParam}`, { method: 'POST', headers: authHeaders() })
     .then((response) => response.json())
     .then((data) => {
-      const failureText = data.failures.length > 0
-        ? ` / 실패 예시: ${data.failures.map((item) => `${item.githubId}(${item.reason})`).join(', ')}`
-        : '';
+      const failureText =
+        data.failures.length > 0
+          ? ` / 실패 예시: ${data.failures.map((item) => `${item.githubId}(${item.reason})`).join(', ')}`
+          : '';
       document.getElementById('sync-result').textContent =
         `블로그 링크 확인 ${data.checked}명, 저장 ${data.updated}명, 비어 있음 ${data.missing}명, 실패 ${data.failed}명${failureText}`;
       toast(`블로그 링크 백필 완료 (${data.updated}명 저장)`);
-      addLog(`블로그 백필 완료 — 확인 ${data.checked}명, 저장 ${data.updated}명, 없음 ${data.missing}명, 실패 ${data.failed}명`, 'ok');
+      addLog(
+        `블로그 백필 완료 — 확인 ${data.checked}명, 저장 ${data.updated}명, 없음 ${data.missing}명, 실패 ${data.failed}명`,
+        'ok',
+      );
       return loadMembers();
     })
-    .catch(() => { toast('블로그 링크 백필 실패'); addLog('블로그 백필 실패', 'err'); })
+    .catch(() => {
+      toast('블로그 링크 백필 실패');
+      addLog('블로그 백필 실패', 'err');
+    })
     .finally(() => {
       button.disabled = false;
       button.textContent = '블로그 링크 백필';
@@ -866,14 +954,18 @@ function renderMembers() {
     return;
   }
 
-  tbody.innerHTML = memberList.map((member) => `
+  tbody.innerHTML = memberList
+    .map(
+      (member) => `
     <tr>
       <td>
         <div class="stack inline">
           <a href="https://github.com/${member.githubId}" target="_blank" style="display:block">
-            ${member.avatarUrl
-              ? `<img class="avatar" src="${member.avatarUrl}" alt="${escapeHtml(member.githubId)} avatar" />`
-              : `<span class="avatar-fallback">${escapeHtml((member.githubId ?? '?').slice(0, 2).toUpperCase())}</span>`}
+            ${
+              member.avatarUrl
+                ? `<img class="avatar" src="${member.avatarUrl}" alt="${escapeHtml(member.githubId)} avatar" />`
+                : `<span class="avatar-fallback">${escapeHtml((member.githubId ?? '?').slice(0, 2).toUpperCase())}</span>`
+            }
           </a>
           <div class="stack">
             <strong>${escapeHtml(member.githubId)}</strong>
@@ -894,11 +986,15 @@ function renderMembers() {
         </div>
       </td>
       <td>
-        ${member.tracks.length > 0 ? `
+        ${
+          member.tracks.length > 0
+            ? `
           <div class="track-list">
             ${member.tracks.map((track) => `<span class="track-badge ${track}">${track == null ? '공통' : track}</span>`).join('')}
           </div>
-        ` : '-'}
+        `
+            : '-'
+        }
       </td>
       <td>
         ${
@@ -908,25 +1004,35 @@ function renderMembers() {
         }
       </td>
       <td>
-        ${member.blog
-          ? `<a class="link" href="${member.blog}" target="_blank" onclick="event.stopPropagation()">${member.blog}</a>
+        ${
+          member.blog
+            ? `<a class="link" href="${member.blog}" target="_blank" onclick="event.stopPropagation()">${member.blog}</a>
              ${member.blogPostsLatest?.length > 0 ? `<button class="btn-sm btn-ghost" style="margin-top:4px" onclick="openBlogModal(${member.id}, '${escapeHtml(member.nickname ?? member.githubId)}')">글 보기</button>` : ''}`
-          : '-'}
+            : '-'
+        }
       </td>
       <td>
         ${renderRssStatus(member)}
       </td>
       <td>
-        ${member.blogPostsLatest.length > 0 ? `
+        ${
+          member?.blogPostsLatest.length > 0
+            ? `
           <div class="post-list">
-            ${member.blogPostsLatest.map((post) => `
+            ${member.blogPostsLatest
+              .map(
+                (post) => `
               <div class="post-item">
                 <a href="${post.url}" target="_blank">${escapeHtml(post.title)}</a>
                 <div class="muted">${new Date(post.publishedAt).toLocaleDateString('ko-KR')}</div>
               </div>
-            `).join('')}
+            `,
+              )
+              .join('')}
           </div>
-        ` : '-'}
+        `
+            : '-'
+        }
       </td>
       <td>
         <div class="actions">
@@ -936,7 +1042,9 @@ function renderMembers() {
         </div>
       </td>
     </tr>
-  `).join('');
+  `,
+    )
+    .join('');
 
   const cohortCounts = {};
   for (const m of memberList) {
@@ -963,12 +1071,16 @@ function renderMemberRoleButtons(member) {
   const roles = member.roles?.length ? member.roles : ['crew'];
   return `
     <div class="role-toggle-group">
-      ${['crew', 'coach', 'reviewer'].map((role) => `
+      ${['crew', 'coach', 'reviewer']
+        .map(
+          (role) => `
         <button
           class="btn-sm role-toggle ${roles.includes(role) ? `active ${role}` : ''}"
           onclick="toggleMemberRole(${member.id}, '${role}')"
         >${roleLabel(role)}</button>
-      `).join('')}
+      `,
+        )
+        .join('')}
     </div>
   `;
 }
@@ -978,19 +1090,22 @@ function renderRssStatus(member) {
     return '<span class="muted">블로그 없음</span>';
   }
 
-  const label = member.rssStatus === 'available'
-    ? 'RSS 가능'
-    : member.rssStatus === 'unavailable'
-      ? 'RSS 없음'
-      : member.rssStatus === 'error'
-        ? '확인 실패'
-        : '확인 전';
+  const label =
+    member.rssStatus === 'available'
+      ? 'RSS 가능'
+      : member.rssStatus === 'unavailable'
+        ? 'RSS 없음'
+        : member.rssStatus === 'error'
+          ? '확인 실패'
+          : '확인 전';
 
   const extra = [
     member.rssUrl ? `<div class="muted">${escapeHtml(member.rssUrl)}</div>` : '',
     member.rssError ? `<div class="muted">${escapeHtml(member.rssError)}</div>` : '',
     member.rssCheckedAt ? `<div class="muted">${new Date(member.rssCheckedAt).toLocaleString('ko-KR')}</div>` : '',
-  ].filter(Boolean).join('');
+  ]
+    .filter(Boolean)
+    .join('');
 
   return `<div class="stack"><span class="pill rss ${member.rssStatus ?? 'unknown'}">${label}</span>${extra}</div>`;
 }
@@ -1005,9 +1120,7 @@ function addMember() {
   const nickname = document.getElementById('new-member-nickname').value.trim() || null;
   const cohortVal = document.getElementById('new-member-cohort').value.trim();
   const cohort = cohortVal ? Number(cohortVal) : null;
-  const roles = ['crew', 'coach', 'reviewer'].filter(
-    (r) => document.getElementById(`new-member-role-${r}`).checked,
-  );
+  const roles = ['crew', 'coach', 'reviewer'].filter((r) => document.getElementById(`new-member-role-${r}`).checked);
   if (roles.length === 0) roles.push('crew');
   const blog = document.getElementById('new-member-blog').value.trim() || null;
 
@@ -1018,9 +1131,9 @@ function addMember() {
   })
     .then((res) => {
       if (!res.ok) throw new Error('failed');
-      ['new-member-github', 'new-member-nickname', 'new-member-cohort', 'new-member-blog'].forEach(
-        (id) => { document.getElementById(id).value = ''; },
-      );
+      ['new-member-github', 'new-member-nickname', 'new-member-cohort', 'new-member-blog'].forEach((id) => {
+        document.getElementById(id).value = '';
+      });
       toast('멤버 추가 완료');
       return Promise.all([loadMembers(), loadStatus()]);
     })
@@ -1042,7 +1155,10 @@ function refreshMemberProfiles() {
     })
     .then((result) => {
       toast(`프로필 갱신 ${result.refreshed}건`);
-      addLog(`프로필 갱신 완료 — 확인 ${result.checked}명, 갱신 ${result.refreshed}명, 실패 ${result.failed}명`, result.failed ? 'err' : 'ok');
+      addLog(
+        `프로필 갱신 완료 — 확인 ${result.checked}명, 갱신 ${result.refreshed}명, 실패 ${result.failed}명`,
+        result.failed ? 'err' : 'ok',
+      );
       return loadMembers();
     })
     .catch((err) => {
@@ -1106,7 +1222,10 @@ function editMemberRoles(id) {
   const current = (member.roles ?? ['crew']).join(', ');
   const rolesInput = prompt('역할 (crew / coach / reviewer, 쉼표로 구분)', current);
   if (rolesInput === null) return;
-  const roles = rolesInput.split(',').map((r) => r.trim()).filter(Boolean);
+  const roles = rolesInput
+    .split(',')
+    .map((r) => r.trim())
+    .filter(Boolean);
 
   fetch(`/admin/members/${id}`, {
     method: 'PATCH',
@@ -1132,9 +1251,7 @@ function toggleMemberRole(id, role) {
   }
 
   const currentRoles = member.roles?.length ? [...member.roles] : ['crew'];
-  let nextRoles = currentRoles.includes(role)
-    ? currentRoles.filter((item) => item !== role)
-    : [...currentRoles, role];
+  let nextRoles = currentRoles.includes(role) ? currentRoles.filter((item) => item !== role) : [...currentRoles, role];
 
   if (nextRoles.length === 0) {
     nextRoles = ['crew'];
@@ -1172,12 +1289,16 @@ function openBlogModal(memberId, name) {
       const renderList = (posts) =>
         posts.length === 0
           ? '<div class="muted" style="padding:8px 0">없음</div>'
-          : posts.map((p) => `
+          : posts
+              .map(
+                (p) => `
             <div class="post-item" style="padding:8px 0;border-bottom:1px solid #f1f5f9">
               <a class="link" href="${p.url}" target="_blank">${escapeHtml(p.title)}</a>
               <div class="muted">${new Date(p.publishedAt).toLocaleDateString('ko-KR')}</div>
             </div>
-          `).join('');
+          `,
+              )
+              .join('');
 
       body.innerHTML = `
         <div style="padding:16px">
@@ -1218,13 +1339,17 @@ function openSubmissionModal(memberId, name) {
   body.innerHTML = `
     <div style="padding:16px">
       <div class="pr-list" style="min-width:0">
-        ${member.submissions.map((submission) => `
+        ${member.submissions
+          .map(
+            (submission) => `
           <div class="post-item" style="padding:10px 0;border-bottom:1px solid #f1f5f9">
             <a href="${submission.prUrl}" target="_blank">${escapeHtml(submission.title)}</a>
             <div class="muted">${escapeHtml(submission.missionRepo.name)} · ${escapeHtml(submission.missionRepo.track == null ? '공통' : submission.missionRepo.track)}</div>
             <div class="muted">#${submission.prNumber} · ${new Date(submission.submittedAt).toLocaleDateString('ko-KR')}</div>
           </div>
-        `).join('')}
+        `,
+          )
+          .join('')}
       </div>
     </div>
   `;
@@ -1278,8 +1403,14 @@ function saveWorkspace() {
       cohortRules,
     }),
   })
-    .then(() => { toast('Workspace 저장 완료'); addLog('Workspace 설정 저장 완료', 'ok'); })
-    .catch(() => { toast('Workspace 저장 실패'); addLog('Workspace 저장 실패', 'err'); });
+    .then(() => {
+      toast('Workspace 저장 완료');
+      addLog('Workspace 설정 저장 완료', 'ok');
+    })
+    .catch(() => {
+      toast('Workspace 저장 실패');
+      addLog('Workspace 저장 실패', 'err');
+    });
 }
 
 function parseJsonOrNull(value) {
@@ -1334,7 +1465,11 @@ function addLog(msg, type = 'info') {
   const now = new Date();
   const ts = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
   renderLogEntry(ts, type, msg);
-  fetch('/admin/logs', { method: 'POST', headers: authHeaders('application/json'), body: JSON.stringify({ type, message: msg }) }).catch(() => {});
+  fetch('/admin/logs', {
+    method: 'POST',
+    headers: authHeaders('application/json'),
+    body: JSON.stringify({ type, message: msg }),
+  }).catch(() => {});
 }
 
 function loadActivityLogs() {
@@ -1355,7 +1490,10 @@ function loadActivityLogs() {
 
 function clearActivityLog() {
   fetch('/admin/logs', { method: 'DELETE', headers: authHeaders() })
-    .then(() => { const body = document.getElementById('log-body'); if (body) body.innerHTML = ''; })
+    .then(() => {
+      const body = document.getElementById('log-body');
+      if (body) body.innerHTML = '';
+    })
     .catch(() => {});
 }
 
@@ -1399,11 +1537,12 @@ function renderRegexModal(result) {
   const body = document.getElementById('regex-modal-body');
   const { samples, suggestion } = result;
 
-  const samplesHtml = samples.map((sample) => {
-    const cohortLabel = sample.cohort !== null ? `${sample.cohort}기` : '기수 불명';
-    const titlesHtml = sample.titles.map((t) => `<span>${escapeHtml(t)}</span>`).join('');
-    const regexVal = sample.detectedRegex ?? '';
-    return `
+  const samplesHtml = samples
+    .map((sample) => {
+      const cohortLabel = sample.cohort !== null ? `${sample.cohort}기` : '기수 불명';
+      const titlesHtml = sample.titles.map((t) => `<span>${escapeHtml(t)}</span>`).join('');
+      const regexVal = sample.detectedRegex ?? '';
+      return `
       <div class="regex-sample">
         <div class="regex-sample-cohort">${escapeHtml(cohortLabel)}</div>
         <div class="regex-sample-titles">${titlesHtml}</div>
@@ -1415,7 +1554,8 @@ function renderRegexModal(result) {
         </div>
       </div>
     `;
-  }).join('');
+    })
+    .join('');
 
   const suggestionRegex = suggestion.nicknameRegex ?? '';
   const suggestionHtml = `
@@ -1500,7 +1640,9 @@ async function startValidateAllRegex() {
     return;
   }
 
-  body.innerHTML = issues.map((result) => renderValidateIssue(result)).join('<hr style="margin:8px 0;border-color:#e2e8f0">');
+  body.innerHTML = issues
+    .map((result) => renderValidateIssue(result))
+    .join('<hr style="margin:8px 0;border-color:#e2e8f0">');
 }
 
 function renderValidateIssue(result) {
@@ -1613,7 +1755,10 @@ let cohortRepoSelectedCohort = null;
 
 function loadCohortRepos() {
   const cohort = Number(document.getElementById('cohort-repo-cohort').value);
-  if (!cohort) { document.getElementById('cohort-repo-table-body').innerHTML = ''; return; }
+  if (!cohort) {
+    document.getElementById('cohort-repo-table-body').innerHTML = '';
+    return;
+  }
   cohortRepoSelectedCohort = cohort;
   fetch(`/admin/cohort-repos?cohort=${cohort}`, { headers: authHeaders() })
     .then((r) => r.json())
@@ -1627,9 +1772,7 @@ function loadCohortRepos() {
 function renderCohortRepos() {
   const tbody = document.getElementById('cohort-repo-table-body');
   const trackFilter = document.getElementById('cohort-repo-track-filter')?.value ?? '';
-  const filtered = trackFilter
-    ? cohortRepoList.filter((e) => e.missionRepo.track === trackFilter)
-    : cohortRepoList;
+  const filtered = trackFilter ? cohortRepoList.filter((e) => e.missionRepo.track === trackFilter) : cohortRepoList;
   if (!filtered.length) {
     tbody.innerHTML = `<tr><td colspan="5" class="muted" style="text-align:center;padding:16px">추가된 레포 없음</td></tr>`;
     return;
@@ -1648,10 +1791,12 @@ function renderCohortRepos() {
     return a - b;
   });
 
-  tbody.innerHTML = sortedLevels.flatMap((level) => {
-    const entries = groups.get(level).sort((a, b) => a.order - b.order);
-    const header = `<tr><td colspan="5" style="background:#f8fafc;font-size:12px;font-weight:700;color:#475569;padding:8px 14px">${level != null ? `${level}단계` : '단계 미지정'} (${entries.length}개)</td></tr>`;
-    const rows = entries.map((entry) => `
+  tbody.innerHTML = sortedLevels
+    .flatMap((level) => {
+      const entries = groups.get(level).sort((a, b) => a.order - b.order);
+      const header = `<tr><td colspan="5" style="background:#f8fafc;font-size:12px;font-weight:700;color:#475569;padding:8px 14px">${level != null ? `${level}단계` : '단계 미지정'} (${entries.length}개)</td></tr>`;
+      const rows = entries.map(
+        (entry) => `
       <tr>
         <td class="muted small">${entry.order}</td>
         <td><strong>${escapeHtml(entry.missionRepo.name)}</strong></td>
@@ -1674,17 +1819,25 @@ function renderCohortRepos() {
           </div>
         </td>
       </tr>
-    `);
-    return [header, ...rows];
-  }).join('');
+    `,
+      );
+      return [header, ...rows];
+    })
+    .join('');
 }
 
 function addCohortRepo() {
   const cohort = cohortRepoSelectedCohort;
-  if (!cohort) { alert('기수를 먼저 선택하세요.'); return; }
+  if (!cohort) {
+    alert('기수를 먼저 선택하세요.');
+    return;
+  }
   const select = document.getElementById('cohort-repo-select');
   const missionRepoId = Number(select.value);
-  if (!missionRepoId) { alert('레포를 선택하세요.'); return; }
+  if (!missionRepoId) {
+    alert('레포를 선택하세요.');
+    return;
+  }
   const levelRaw = document.getElementById('cohort-repo-level').value;
   const level = levelRaw ? Number(levelRaw) : null;
   const order = Number(document.getElementById('cohort-repo-order').value) || 0;
@@ -1695,12 +1848,17 @@ function addCohortRepo() {
   };
 
   saveLevel()
-    .then(() => fetch('/admin/cohort-repos', {
-      method: 'POST',
-      headers: authHeaders('application/json'),
-      body: JSON.stringify({ cohort, missionRepoId, order }),
-    }))
-    .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
+    .then(() =>
+      fetch('/admin/cohort-repos', {
+        method: 'POST',
+        headers: authHeaders('application/json'),
+        body: JSON.stringify({ cohort, missionRepoId, order }),
+      }),
+    )
+    .then((r) => {
+      if (!r.ok) throw new Error();
+      return r.json();
+    })
     .then(() => {
       document.getElementById('cohort-repo-level').value = '';
       document.getElementById('cohort-repo-order').value = '';
@@ -1725,13 +1883,19 @@ function setCohortRepoOrder(id, value) {
 function deleteCohortRepo(id) {
   if (!confirm('이 레포를 기수 목록에서 제거하시겠습니까?')) return;
   fetch(`/admin/cohort-repos/${id}`, { method: 'DELETE', headers: authHeaders() })
-    .then(() => { toast('제거됨'); loadCohortRepos(); })
+    .then(() => {
+      toast('제거됨');
+      loadCohortRepos();
+    })
     .catch(() => alert('삭제 실패'));
 }
 
 function triggerCohortSync() {
   const cohort = cohortRepoSelectedCohort ?? Number(document.getElementById('cohort-repo-cohort').value);
-  if (!cohort) { alert('기수를 먼저 선택하세요.'); return; }
+  if (!cohort) {
+    alert('기수를 먼저 선택하세요.');
+    return;
+  }
 
   const btn = document.getElementById('cohort-sync-btn');
   const progressWrap = document.getElementById('sync-progress-wrap');
@@ -1787,23 +1951,37 @@ function triggerCohortSync() {
 
 function autoFillCohortRepos() {
   const cohort = cohortRepoSelectedCohort ?? Number(document.getElementById('cohort-repo-cohort').value);
-  if (!cohort) { alert('기수를 먼저 선택하세요.'); return; }
+  if (!cohort) {
+    alert('기수를 먼저 선택하세요.');
+    return;
+  }
   fetch('/admin/cohort-repos/auto-fill', {
     method: 'POST',
     headers: authHeaders('application/json'),
     body: JSON.stringify({ cohort }),
   })
     .then((r) => r.json())
-    .then((data) => { toast(`${data.added}개 레포 자동 추가됨`); addLog(`기수 레포 자동 채우기 완료 — ${cohort}기, ${data.added}개 추가`, 'ok'); loadCohortRepos(); })
-    .catch(() => { alert('자동 채우기 실패'); addLog(`기수 레포 자동 채우기 실패 — ${cohort}기`, 'err'); });
+    .then((data) => {
+      toast(`${data.added}개 레포 자동 추가됨`);
+      addLog(`기수 레포 자동 채우기 완료 — ${cohort}기, ${data.added}개 추가`, 'ok');
+      loadCohortRepos();
+    })
+    .catch(() => {
+      alert('자동 채우기 실패');
+      addLog(`기수 레포 자동 채우기 실패 — ${cohort}기`, 'err');
+    });
 }
 
 function populateCohortRepoSelect() {
   const select = document.getElementById('cohort-repo-select');
   const trackFilter = document.getElementById('cohort-repo-track-filter')?.value ?? '';
   const filtered = trackFilter ? repoList.filter((r) => r.track === trackFilter) : repoList;
-  select.innerHTML = '<option value="">레포 선택</option>' +
+  select.innerHTML =
+    '<option value="">레포 선택</option>' +
     filtered
-      .map((r) => `<option value="${r.id}">[${r.status}] ${escapeHtml(r.name)}${r.level != null ? ` (레벨${r.level})` : ''}</option>`)
+      .map(
+        (r) =>
+          `<option value="${r.id}">[${r.status}] ${escapeHtml(r.name)}${r.level != null ? ` (레벨${r.level})` : ''}</option>`,
+      )
       .join('');
 }
