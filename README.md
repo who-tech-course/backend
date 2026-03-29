@@ -46,8 +46,17 @@ src/
 └── public/
     ├── admin.html                # 어드민 UI 마크업
     ├── admin.css                 # 어드민 스타일
-    └── admin.js                  # 어드민 동작 로직
+    └── admin/                    # 어드민 동작 로직 (ES modules, entry: main.js)
+        ├── main.js               # window 노출 + 초기화
+        ├── state.js              # 공유 상태
+        ├── http.js               # 인증 헤더, 오류 파싱
+        ├── utils.js              # escapeHtml, toast 등
+        ├── auth.js, bootstrap.js, logs.js, workspace.js
+        ├── repos.js, members.js, sync.js, blog.js
+        ├── regex.js, cohort-repos.js
 ```
+
+`admin.html`은 `/admin/ui/admin/main.js`를 `type="module"`로 로드합니다.
 
 ### 의존성 주입 구조
 

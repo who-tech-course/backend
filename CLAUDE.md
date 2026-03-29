@@ -93,7 +93,7 @@ DELETE /admin/logs                    — 전체 로그 삭제
 ```
 
 모든 `/admin` 엔드포인트는 `Authorization: Bearer <ADMIN_SECRET>` 필요.
-어드민 UI: `GET /admin/ui/admin.html`
+어드민 UI: `GET /admin/ui/admin.html` — 정적 JS는 `admin/` 디렉터리 ES 모듈(`main.js` 엔트리, `window`에 핸들러 노출로 기존 `onclick` 유지)
 
 ### 공개 API (인증 불필요)
 

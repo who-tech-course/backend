@@ -1,11 +1,19 @@
 import type { NicknameStat } from './types/index.js';
 
 export function normalizeNickname(nickname: string): string {
-  return nickname
+  let s = nickname
     .replace(/\s*\([^)]*\)\s*$/, '') // 빌리(정환희) → 빌리
-    .replace(/^[\[({]+|[\])}]+$/g, '') // [버건디] → 버건디
-    .replace(/[^가-힣]/g, '') // 한글만
+    .replace(/^[\[({]+/g, '')
+    .replace(/[\])}]+$/g, '') // [버건디] → 버건디
     .trim();
+
+  while (/[!.,，]+$/.test(s)) {
+    s = s.replace(/[!.,，]+$/g, '').trim();
+  }
+
+  // 한글 닉네임(쉼표·공백 포함)과 영문/숫자/하이픈 닉네임 모두 허용
+  s = s.replace(/[^\s\-,0-9A-Za-z가-힣]/g, '');
+  return s.trim();
 }
 
 export function parseNicknameStats(value: string | null | undefined): NicknameStat[] {
