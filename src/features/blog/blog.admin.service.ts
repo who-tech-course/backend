@@ -5,6 +5,7 @@ import type { BlogService } from './blog.service.js';
 import { probeRss } from './blog.service.js';
 import { fetchUserBlogCandidates } from '../sync/github.service.js';
 import { mergePreviousGithubIds } from '../../shared/github-profile.js';
+// blog.admin.service.ts
 
 export function createBlogAdminService(deps: {
   memberRepo: MemberRepository;
@@ -23,16 +24,18 @@ export function createBlogAdminService(deps: {
       return blogService.syncBlogs(workspace.id);
     },
 
-    // 1. limit 인자 다시 추가
+    // 1. limit을 인자로 받긴 하되, 리포지토리에는 넘기지 않습니다.
     backfillWorkspaceBlogLinks: async (limit = 30, cohort?: number) => {
       const workspace = await workspaceService.getOrThrow();
 
-      // 2. findWithFilters에 limit(take) 전달
-      const members = await memberRepo.findWithFilters(workspace.id, {
+      // 2. 리포지토리에는 limit을 빼고 호출하여 에러를 방지합니다.
+      const allTargetMembers = await memberRepo.findWithFilters(workspace.id, {
         hasBlog: false,
-        limit, // 👈 리포지토리에 limit 전달
         ...(cohort !== undefined ? { cohort } : {}),
       });
+
+      // 3. 자바스크립트에서 요청받은 limit만큼만 자릅니다. (에러 원천 차단)
+      const members = allTargetMembers.slice(0, limit);
 
       let updated = 0;
       let missing = 0;
@@ -40,6 +43,7 @@ export function createBlogAdminService(deps: {
 
       for (const member of members) {
         try {
+          // ... (이하 로직은 기존과 동일) ...
           const { profile, candidates } = await fetchUserBlogCandidates(octokit, {
             githubUserId: member.githubUserId,
             username: member.githubId,
@@ -92,16 +96,16 @@ export function createBlogAdminService(deps: {
             });
             updated++;
           } else {
-            await memberRepo.patch(member.id, {
-              ...baseFields,
-            });
+            await memberRepo.patch(member.id, { ...baseFields });
             missing++;
           }
-        } catch (error) {
-          const reason =
-            typeof error === 'object' && error !== null && 'status' in error
-              ? `github_api_${String((error as any).status)}`
-              : 'github_api_error';
+        } catch (error: unknown) {
+          let reason = 'github_api_error';
+
+          if (typeof error === 'object' && error !== null && 'status' in error) {
+            reason = `github_api_${String((error as { status: number | string }).status)}`;
+          }
+
           failures.push({ githubId: member.githubId, reason });
         }
       }
@@ -116,5 +120,4 @@ export function createBlogAdminService(deps: {
     },
   };
 }
-
 export type BlogAdminService = ReturnType<typeof createBlogAdminService>;
