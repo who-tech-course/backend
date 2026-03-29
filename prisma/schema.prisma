@@ -70,8 +70,8 @@ model MemberCohort {
   memberId Int
   cohortId Int
   roleId   Int
-  role     Role   @relation(fields: [roleId], references: [id])
-  cohort   Cohort @relation(fields: [cohortId], references: [id])
+  role     Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  cohort   Cohort @relation(fields: [cohortId], references: [id], onDelete: Cascade)
   member   Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
   @@unique([memberId, cohortId, roleId])
@@ -123,7 +123,7 @@ model Submission {
   memberId      Int
   missionRepoId Int
   missionRepo   MissionRepo @relation(fields: [missionRepoId], references: [id])
-  member        Member      @relation(fields: [memberId], references: [id])
+  member        Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
   @@unique([prNumber, missionRepoId])
 }
@@ -135,7 +135,7 @@ model BlogPost {
   publishedAt DateTime
   memberId    Int
   createdAt   DateTime @default(now())
-  member      Member   @relation(fields: [memberId], references: [id])
+  member      Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
 }
 
 model BlogPostLatest {
@@ -144,7 +144,7 @@ model BlogPostLatest {
   title       String
   publishedAt DateTime
   memberId    Int
-  member      Member   @relation(fields: [memberId], references: [id])
+  member      Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
 }
 
 model ActivityLog {
