@@ -87,6 +87,16 @@ export function createMemberPublicService(deps: {
         }[];
       }[] = [];
 
+      // Get all defined cohorts for this user from CohortRepo
+      const allDefinedCohorts = new Set<number>();
+      for (const { cohort } of cohorts) {
+        const cohortRepos = await cohortRepoRepo.findByCohort(workspace.id, cohort);
+        if (cohortRepos.length > 0) {
+          allDefinedCohorts.add(cohort);
+        }
+      }
+
+      // Build archive only for cohorts with defined CohortRepo
       for (const { cohort } of cohorts) {
         const cohortRepos = await cohortRepoRepo.findByCohort(workspace.id, cohort);
         if (cohortRepos.length === 0) continue;
@@ -119,7 +129,8 @@ export function createMemberPublicService(deps: {
         archive.push(cohortArchive);
       }
 
-      if (archive.length === 0 && member.submissions.length > 0) {
+      // Fallback: only if NO cohort has CohortRepo defined
+      if (archive.length === 0 && allDefinedCohorts.size === 0 && member.submissions.length > 0) {
         const levelMap = new Map<number | null, ArchiveRepo[]>();
         for (const s of [...member.submissions].reverse()) {
           const level = s.missionRepo.level;
