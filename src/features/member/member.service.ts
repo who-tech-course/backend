@@ -1,5 +1,5 @@
 import type { Octokit } from '@octokit/rest';
-import type { MemberRepository } from '../../db/repositories/member.repository.js';
+import type { MemberRepository, MemberWithRelations } from '../../db/repositories/member.repository.js';
 import type { BlogPostRepository } from '../../db/repositories/blog-post.repository.js';
 import type { WorkspaceService } from '../workspace/workspace.service.js';
 import { normalizeBlogUrl } from '../../shared/blog.js';
@@ -15,14 +15,18 @@ export function createMemberService(deps: {
 }) {
   const { memberRepo, blogPostRepo, workspaceService, octokit } = deps;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const toResponse = (member: any) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const cohorts = (member.memberCohorts || []).map((mc: any) => ({
-      cohort: mc.cohort,
-      roles: parseRoles(mc.roles),
-    }));
-    const primaryCohort = [...cohorts].sort((a, b) => b.cohort - a.cohort)[0];
+  const toResponse = (member: MemberWithRelations) => {
+    const cohortMap = new Map<number, string[]>();
+    for (const mc of member.memberCohorts) {
+      if (!cohortMap.has(mc.cohort.number)) cohortMap.set(mc.cohort.number, []);
+      cohortMap.get(mc.cohort.number)!.push(mc.role.name);
+    }
+
+    const cohorts = [...cohortMap.entries()]
+      .map(([cohort, roles]) => ({ cohort, roles }))
+      .sort((a, b) => b.cohort - a.cohort);
+
+    const primaryCohort = cohorts[0];
 
     return {
       id: member.id,
@@ -38,23 +42,10 @@ export function createMemberService(deps: {
       cohorts,
       cohort: primaryCohort?.cohort ?? null,
       roles: primaryCohort?.roles ?? ['crew'],
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      tracks: [
-        ...new Set((member.submissions || []).map((s: any) => s.missionRepo.track).filter((t: any) => t !== null)),
-      ],
+      tracks: [...new Set(member.submissions.map((s) => s.missionRepo.track).filter((t) => t !== null))],
       _count: member._count,
     };
   };
-
-  function parseRoles(raw: string | null | undefined): string[] {
-    if (!raw) return ['crew'];
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : ['crew'];
-    } catch {
-      return ['crew'];
-    }
-  }
 
   async function refreshMemberProfileById(id: number) {
     const member = await memberRepo.findByIdWithRelations(id);
@@ -93,6 +84,12 @@ export function createMemberService(deps: {
       return members.map(toResponse);
     },
 
+    getByGithubId: async (githubId: string) => {
+      const workspace = await workspaceService.getOrThrow();
+      const member = await memberRepo.findPublicDetail(githubId, workspace.id);
+      return member ? toResponse(member) : null;
+    },
+
     createMember: async (input: {
       githubId: string;
       nickname?: string | null;
@@ -119,15 +116,14 @@ export function createMemberService(deps: {
       });
 
       if (input.cohort != null) {
-        await memberRepo.upsertCohort(
-          member.id,
-          input.cohort,
-          JSON.stringify(input.roles?.length ? input.roles : ['crew']),
-        );
+        const roles = input.roles?.length ? input.roles : ['crew'];
+        for (const role of roles) {
+          await memberRepo.upsertParticipation(member.id, input.cohort, role);
+        }
       }
 
       const updated = await memberRepo.findByIdWithRelations(member.id);
-      return toResponse(updated);
+      return updated ? toResponse(updated) : null;
     },
 
     updateMember: async (
@@ -148,11 +144,18 @@ export function createMemberService(deps: {
       });
 
       if (input.cohort != null && input.roles !== undefined) {
-        await memberRepo.upsertCohort(id, input.cohort, JSON.stringify(input.roles));
+        for (const role of input.roles) {
+          await memberRepo.upsertParticipation(id, input.cohort, role);
+        }
       }
 
       const updated = await memberRepo.findByIdWithRelations(id);
-      return toResponse(updated);
+      return updated ? toResponse(updated) : null;
+    },
+
+    get: async (id: number) => {
+      const member = await memberRepo.findByIdWithRelations(id);
+      return member ? toResponse(member) : null;
     },
 
     getMemberBlogPosts: (id: number) => blogPostRepo.findByMember(id),

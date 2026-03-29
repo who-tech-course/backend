@@ -1,5 +1,29 @@
 import type { PrismaClient, Prisma } from '@prisma/client';
 
+const blogPostWithMemberInclude = {
+  member: {
+    include: {
+      memberCohorts: {
+        include: {
+          cohort: true,
+          role: true,
+        },
+      },
+      submissions: {
+        select: {
+          missionRepo: {
+            select: { track: true },
+          },
+        },
+      },
+    },
+  },
+};
+
+export type BlogPostWithMember = Prisma.BlogPostLatestGetPayload<{
+  include: typeof blogPostWithMemberInclude;
+}>;
+
 export function createBlogPostRepository(db: PrismaClient) {
   return {
     upsert: (args: Prisma.BlogPostUpsertArgs) => db.blogPost.upsert(args),
@@ -24,27 +48,12 @@ export function createBlogPostRepository(db: PrismaClient) {
         where: {
           member: {
             workspaceId,
-            ...(filters?.cohort ? { cohort: filters.cohort } : {}),
+            ...(filters?.cohort ? { memberCohorts: { some: { cohort: { number: filters.cohort } } } } : {}),
             ...(filters?.track ? { submissions: { some: { missionRepo: { track: filters.track } } } } : {}),
           },
         },
         orderBy: { publishedAt: 'desc' },
-        include: {
-          member: {
-            select: {
-              githubId: true,
-              nickname: true,
-              manualNickname: true,
-              nicknameStats: true,
-              avatarUrl: true,
-              cohort: true,
-              roles: true,
-              submissions: {
-                select: { missionRepo: { select: { track: true } } },
-              },
-            },
-          },
-        },
+        include: blogPostWithMemberInclude,
       }),
 
     refreshLatest: async (since: Date) => {

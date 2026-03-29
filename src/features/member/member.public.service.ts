@@ -12,36 +12,37 @@ export function createMemberPublicService(deps: {
 }) {
   const { memberRepo, blogPostRepo, cohortRepoRepo, workspaceService } = deps;
 
-  function parseRoles(raw: string | null | undefined): string[] {
-    if (!raw) return ['crew'];
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : ['crew'];
-    } catch {
-      return ['crew'];
-    }
+  interface ArchiveRepo {
+    name: string;
+    track: string | null;
+    tabCategory: string;
+    submissions: Array<{ prUrl: string; prNumber: number; title: string; submittedAt: Date }> | null;
   }
 
   return {
     searchMembers: async (filters?: { q?: string; cohort?: number; track?: string; role?: string }) => {
       const workspace = await workspaceService.getOrThrow();
       const members = await memberRepo.findWithFilters(workspace.id, filters);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return members.map((m: any) => {
-        const targetCohort = filters?.cohort
-          ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            m.memberCohorts.find((c: any) => c.cohort === filters.cohort)
-          : // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            [...m.memberCohorts].sort((a: any, b: any) => b.cohort - a.cohort)[0];
+      return members.map((m) => {
+        const cohortMap = new Map<number, string[]>();
+        for (const mc of m.memberCohorts) {
+          if (!cohortMap.has(mc.cohort.number)) cohortMap.set(mc.cohort.number, []);
+          cohortMap.get(mc.cohort.number)!.push(mc.role.name);
+        }
+
+        const cohorts = [...cohortMap.entries()]
+          .map(([cohort, roles]) => ({ cohort, roles }))
+          .sort((a, b) => b.cohort - a.cohort);
+
+        const targetCohort = filters?.cohort ? cohorts.find((c) => c.cohort === filters.cohort) : cohorts[0];
 
         return {
           githubId: m.githubId,
           nickname: resolveDisplayNickname(m.manualNickname, m.nicknameStats, m.nickname),
           avatarUrl: m.avatarUrl,
           cohort: targetCohort?.cohort ?? null,
-          roles: parseRoles(targetCohort?.roles),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          tracks: [...new Set(m.submissions.map((s: any) => s.missionRepo.track).filter((t: any) => t !== null))],
+          roles: targetCohort?.roles ?? ['crew'],
+          tracks: [...new Set(m.submissions.map((s) => s.missionRepo.track).filter((t) => t !== null))],
           blog: m.blog,
           lastPostedAt: m.lastPostedAt,
         };
@@ -53,21 +54,17 @@ export function createMemberPublicService(deps: {
       const member = await memberRepo.findPublicDetail(githubId, workspace.id);
       if (!member) return null;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const nickname = resolveDisplayNickname(
-        member.manualNickname,
-        (member as any).nicknameStats,
-        (member as any).nickname,
-      );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const memberCohorts = [...((member as any).memberCohorts || [])].sort((a: any, b: any) => b.cohort - a.cohort);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const tracks = [
-        ...new Set(member.submissions.map((s: any) => s.missionRepo.track).filter((t: any) => t !== null)),
-      ];
+      const nickname = resolveDisplayNickname(member.manualNickname, member.nicknameStats, member.nickname);
+      const cohortMap = new Map<number, string[]>();
+      for (const mc of member.memberCohorts) {
+        if (!cohortMap.has(mc.cohort.number)) cohortMap.set(mc.cohort.number, []);
+        cohortMap.get(mc.cohort.number)!.push(mc.role.name);
+      }
 
-      // 기수별 레포 순서 기반 아카이브 구성
-      // missionRepoId별로 모든 submissions를 수집 (오래된 순 → step1, step2, ...)
+      const cohorts = [...cohortMap.entries()]
+        .map(([cohort, roles]) => ({ cohort, roles }))
+        .sort((a, b) => b.cohort - a.cohort);
+
       const submissionsByRepo = new Map<
         number,
         Array<{ prUrl: string; prNumber: number; title: string; submittedAt: Date }>
@@ -86,20 +83,15 @@ export function createMemberPublicService(deps: {
         cohort: number;
         levels: {
           level: number | null;
-          repos: {
-            name: string;
-            track: string | null;
-            tabCategory: string;
-            submissions: Array<{ prUrl: string; prNumber: number; title: string; submittedAt: Date }> | null;
-          }[];
+          repos: ArchiveRepo[];
         }[];
       }[] = [];
 
-      for (const mc of memberCohorts) {
-        const cohortRepos = await cohortRepoRepo.findByCohort(workspace.id, mc.cohort);
+      for (const { cohort } of cohorts) {
+        const cohortRepos = await cohortRepoRepo.findByCohort(workspace.id, cohort);
         if (cohortRepos.length === 0) continue;
 
-        const levelMap = new Map<number | null, any[]>();
+        const levelMap = new Map<number | null, ArchiveRepo[]>();
         for (const cr of cohortRepos) {
           const level = cr.missionRepo.level;
           if (!levelMap.has(level)) levelMap.set(level, []);
@@ -118,7 +110,7 @@ export function createMemberPublicService(deps: {
         });
 
         const cohortArchive = {
-          cohort: mc.cohort,
+          cohort,
           levels: sortedLevels.map((level) => ({
             level,
             repos: levelMap.get(level)!,
@@ -127,9 +119,8 @@ export function createMemberPublicService(deps: {
         archive.push(cohortArchive);
       }
 
-      // CohortRepo 미등록 상태거나 submissions가 남았으면 fallback
       if (archive.length === 0 && member.submissions.length > 0) {
-        const levelMap = new Map<number | null, any[]>();
+        const levelMap = new Map<number | null, ArchiveRepo[]>();
         for (const s of [...member.submissions].reverse()) {
           const level = s.missionRepo.level;
           const name = s.missionRepo.name;
@@ -163,11 +154,8 @@ export function createMemberPublicService(deps: {
         githubId: member.githubId,
         nickname,
         avatarUrl: member.avatarUrl,
-        cohorts: memberCohorts.map((mc: any) => ({
-          cohort: mc.cohort,
-          roles: parseRoles(mc.roles),
-        })),
-        tracks,
+        cohorts,
+        tracks: [...new Set(member.submissions.map((s) => s.missionRepo.track).filter((t) => t !== null))],
         blog: member.blog,
         lastPostedAt: member.lastPostedAt,
         archive,
@@ -176,16 +164,20 @@ export function createMemberPublicService(deps: {
     },
 
     getFeed: async (filters?: { cohort?: number; track?: string }) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const workspace: any = await workspaceService.getOrThrow();
+      const workspace = await workspaceService.getOrThrow();
       const posts = await blogPostRepo.findFeed(workspace.id, filters);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return posts.map((p: any) => {
-        const targetCohort = filters?.cohort
-          ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            p.member.memberCohorts.find((c: any) => c.cohort === filters.cohort)
-          : // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            [...p.member.memberCohorts].sort((a: any, b: any) => b.cohort - a.cohort)[0];
+      return posts.map((p) => {
+        const cohortMap = new Map<number, string[]>();
+        for (const mc of p.member.memberCohorts) {
+          if (!cohortMap.has(mc.cohort.number)) cohortMap.set(mc.cohort.number, []);
+          cohortMap.get(mc.cohort.number)!.push(mc.role.name);
+        }
+
+        const cohorts = [...cohortMap.entries()]
+          .map(([cohort, roles]) => ({ cohort, roles }))
+          .sort((a, b) => b.cohort - a.cohort);
+
+        const targetCohort = filters?.cohort ? cohorts.find((c) => c.cohort === filters.cohort) : cohorts[0];
 
         return {
           url: p.url,
@@ -196,11 +188,8 @@ export function createMemberPublicService(deps: {
             nickname: resolveDisplayNickname(p.member.manualNickname, p.member.nicknameStats, p.member.nickname),
             avatarUrl: p.member.avatarUrl,
             cohort: targetCohort?.cohort ?? null,
-            roles: parseRoles(targetCohort?.roles),
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            tracks: [
-              ...new Set(p.member.submissions.map((s: any) => s.missionRepo.track).filter((t: any) => t !== null)),
-            ],
+            roles: targetCohort?.roles ?? ['crew'],
+            tracks: [...new Set(p.member.submissions.map((s) => s.missionRepo.track).filter((t) => t !== null))],
           },
         };
       });

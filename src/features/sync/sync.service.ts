@@ -199,7 +199,7 @@ export function createSyncService(deps: {
         const member = existingMember
           ? await memberRepo.update(existingMember.id, {
               ...memberData,
-              ...(existingMember?.blog ? {} : { blog }),
+              ...(existingMember?.blog ? { blog } : {}),
             })
           : await memberRepo.create({
               ...memberData,
@@ -208,8 +208,7 @@ export function createSyncService(deps: {
             });
 
         if (s.cohort) {
-          const defaultRoles = JSON.stringify(['crew']);
-          await memberRepo.upsertCohort(member.id, s.cohort, defaultRoles);
+          await memberRepo.upsertParticipation(member.id, s.cohort, 'crew');
         }
 
         await submissionRepo.upsert({

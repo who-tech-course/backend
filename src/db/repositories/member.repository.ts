@@ -1,27 +1,36 @@
-import type { PrismaClient, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 
-const memberWithRelationsInclude = {
+const memberWithRelationsInclude = Prisma.validator<Prisma.MemberInclude>()({
   _count: { select: { submissions: true } },
   blogPostsLatest: { orderBy: { publishedAt: 'desc' as const } },
-  memberCohorts: true,
+  memberCohorts: {
+    include: {
+      cohort: true,
+      role: true,
+    },
+  },
   submissions: {
     orderBy: { submittedAt: 'desc' as const },
-    include: { missionRepo: { select: { name: true, track: true } } },
+    include: { missionRepo: { select: { id: true, name: true, track: true, level: true, tabCategory: true } } },
   },
-} satisfies Prisma.MemberInclude;
+});
+
+export type MemberWithRelations = Prisma.MemberGetPayload<{
+  include: typeof memberWithRelationsInclude;
+}>;
 
 export function createMemberRepository(db: PrismaClient) {
   return {
     findWithFilters: (
       workspaceId: number,
       filters?: { q?: string; cohort?: number; hasBlog?: boolean; track?: string; role?: string },
-    ) =>
+    ): Promise<MemberWithRelations[]> =>
       db.member.findMany({
         where: {
           workspaceId,
-          ...(filters?.cohort ? { memberCohorts: { some: { cohort: filters.cohort } } } : {}),
-          // roles filtering across all cohorts or specific to the filtered cohort
-          ...(filters?.role ? { memberCohorts: { some: { roles: { contains: `"${filters.role}"` } } } } : {}),
+          ...(filters?.cohort ? { memberCohorts: { some: { cohort: { number: filters.cohort } } } } : {}),
+          ...(filters?.role ? { memberCohorts: { some: { role: { name: { contains: filters.role } } } } } : {}),
           ...(filters?.hasBlog === true ? { blog: { not: null } } : {}),
           ...(filters?.hasBlog === false ? { blog: null } : {}),
           ...(filters?.track ? { submissions: { some: { missionRepo: { track: filters.track } } } } : {}),
@@ -43,54 +52,23 @@ export function createMemberRepository(db: PrismaClient) {
     findMany: <T extends Prisma.MemberFindManyArgs>(args: Prisma.SelectSubset<T, Prisma.MemberFindManyArgs>) =>
       db.member.findMany<T>(args),
 
-    findByGithubId: (githubId: string, workspaceId: number) =>
+    findByGithubId: (githubId: string, workspaceId: number): Promise<MemberWithRelations | null> =>
       db.member.findUnique({
         where: { githubId_workspaceId: { githubId, workspaceId } },
-        select: {
-          id: true,
-          githubUserId: true,
-          githubId: true,
-          previousGithubIds: true,
-          nickname: true,
-          manualNickname: true,
-          nicknameStats: true,
-          avatarUrl: true,
-          profileFetchedAt: true,
-          profileRefreshError: true,
-          blog: true,
-          rssStatus: true,
-          rssUrl: true,
-          rssCheckedAt: true,
-          rssError: true,
-        },
+        include: memberWithRelationsInclude,
       }),
 
-    findByGithubUserId: (githubUserId: number, workspaceId: number) =>
+    findByGithubUserId: (githubUserId: number, workspaceId: number): Promise<MemberWithRelations | null> =>
       db.member.findUnique({
         where: { githubUserId_workspaceId: { githubUserId, workspaceId } },
-        select: {
-          id: true,
-          githubUserId: true,
-          githubId: true,
-          previousGithubIds: true,
-          nickname: true,
-          manualNickname: true,
-          nicknameStats: true,
-          avatarUrl: true,
-          profileFetchedAt: true,
-          profileRefreshError: true,
-          blog: true,
-          rssStatus: true,
-          rssUrl: true,
-          rssCheckedAt: true,
-          rssError: true,
-        },
+        include: memberWithRelationsInclude,
       }),
 
-    create: (data: Prisma.MemberUncheckedCreateInput) =>
+    create: (data: Prisma.MemberUncheckedCreateInput): Promise<MemberWithRelations> =>
       db.member.create({ data, include: memberWithRelationsInclude }),
 
-    update: (id: number, data: Prisma.MemberUncheckedUpdateInput) => db.member.update({ where: { id }, data }),
+    update: (id: number, data: Prisma.MemberUncheckedUpdateInput): Promise<MemberWithRelations> =>
+      db.member.update({ where: { id }, data, include: memberWithRelationsInclude }),
 
     updateWithRelations: (
       id: number,
@@ -103,14 +81,13 @@ export function createMemberRepository(db: PrismaClient) {
         profileFetchedAt?: Date | null;
         profileRefreshError?: string | null;
         blog?: string | null;
-        roles?: string;
         rssStatus?: string;
         rssUrl?: string | null;
         rssCheckedAt?: Date | null;
         rssError?: string | null;
         lastPostedAt?: Date | null;
       },
-    ) => db.member.update({ where: { id }, data, include: memberWithRelationsInclude }),
+    ): Promise<MemberWithRelations> => db.member.update({ where: { id }, data, include: memberWithRelationsInclude }),
 
     patch: (
       id: number,
@@ -130,37 +107,46 @@ export function createMemberRepository(db: PrismaClient) {
       },
     ) => db.member.update({ where: { id }, data }),
 
-    upsertCohort: (memberId: number, cohort: number, roles: string) =>
-      db.memberCohort.upsert({
-        where: { memberId_cohort: { memberId, cohort } },
-        create: { memberId, cohort, roles },
-        update: { roles },
-      }),
+    upsertParticipation: async (memberId: number, cohortNumber: number, roleName: string) => {
+      const cohort = await db.cohort.upsert({
+        where: { number: cohortNumber },
+        create: { number: cohortNumber },
+        update: {},
+      });
 
-    findPublicDetail: (githubId: string, workspaceId: number) =>
+      const role = await db.role.upsert({
+        where: { name: roleName },
+        create: { name: roleName },
+        update: {},
+      });
+
+      return db.memberCohort.upsert({
+        where: { memberId_cohortId_roleId: { memberId, cohortId: cohort.id, roleId: role.id } },
+        create: { memberId, cohortId: cohort.id, roleId: role.id },
+        update: {},
+      });
+    },
+
+    findPublicDetail: (githubId: string, workspaceId: number): Promise<MemberWithRelations | null> =>
       db.member.findFirst({
-        where: { workspaceId, OR: [{ githubId }, { previousGithubIds: { contains: `"${githubId}"` } }] },
-        include: {
-          submissions: {
-            include: {
-              missionRepo: { select: { name: true, track: true, level: true, tabCategory: true } },
-            },
-            orderBy: { submittedAt: 'desc' },
-          },
-          blogPostsLatest: {
-            orderBy: { publishedAt: 'desc' },
-            take: 10,
-          },
+        where: {
+          workspaceId,
+          OR: [{ githubId }, { previousGithubIds: { contains: `"${githubId}"` } }],
         },
+        include: memberWithRelationsInclude,
       }),
 
-    findByIdWithRelations: (id: number) => db.member.findUnique({ where: { id }, include: memberWithRelationsInclude }),
+    findByIdWithRelations: (id: number): Promise<MemberWithRelations | null> =>
+      db.member.findUnique({ where: { id }, include: memberWithRelationsInclude }),
 
-    listStaleProfiles: (workspaceId: number, options?: { limit?: number; cohort?: number; staleBefore?: Date }) =>
+    listStaleProfiles: (
+      workspaceId: number,
+      options?: { limit?: number; cohort?: number; staleBefore?: Date },
+    ): Promise<MemberWithRelations[]> =>
       db.member.findMany({
         where: {
           workspaceId,
-          ...(options?.cohort != null ? { cohort: options.cohort } : {}),
+          ...(options?.cohort != null ? { memberCohorts: { some: { cohort: { number: options.cohort } } } } : {}),
           OR: [
             { profileFetchedAt: null },
             ...(options?.staleBefore ? [{ profileFetchedAt: { lt: options.staleBefore } }] : []),
@@ -169,15 +155,7 @@ export function createMemberRepository(db: PrismaClient) {
         },
         orderBy: [{ profileFetchedAt: 'asc' }, { id: 'asc' }],
         take: options?.limit ?? 30,
-        select: {
-          id: true,
-          githubId: true,
-          githubUserId: true,
-          previousGithubIds: true,
-          avatarUrl: true,
-          blog: true,
-          profileFetchedAt: true,
-        },
+        include: memberWithRelationsInclude,
       }),
 
     count: () => db.member.count(),

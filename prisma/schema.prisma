@@ -23,29 +23,58 @@ model Workspace {
 }
 
 model Member {
-  id              Int              @id @default(autoincrement())
-  githubId        String
-  nickname        String?
-  manualNickname  String?
-  nicknameStats   String?
-  avatarUrl       String?
-  cohort          Int?
-  blog            String?
-  rssStatus       String           @default("unknown")
-  rssUrl          String?
-  rssCheckedAt    DateTime?
-  rssError        String?
-  roles           String           @default("[\"crew\"]")
-  workspaceId     Int
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  blogPosts       BlogPost[]
-  blogPostsLatest BlogPostLatest[]
-  workspace       Workspace        @relation(fields: [workspaceId], references: [id])
-  submissions     Submission[]
-  memberCohorts   MemberCohort[]
+  id                  Int              @id @default(autoincrement())
+  githubUserId        Int?
+  githubId            String
+  previousGithubIds   String?
+  nickname            String?
+  manualNickname      String?
+  nicknameStats       String?
+  avatarUrl           String?
+  profileFetchedAt    DateTime?
+  profileRefreshError String?
+  blog                String?
+  rssStatus           String           @default("unknown")
+  rssUrl              String?
+  rssCheckedAt        DateTime?
+  rssError            String?
+  lastPostedAt        DateTime?
+  workspaceId         Int
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  blogPosts           BlogPost[]
+  blogPostsLatest     BlogPostLatest[]
+  workspace           Workspace        @relation(fields: [workspaceId], references: [id])
+  memberCohorts       MemberCohort[]
+  submissions         Submission[]
 
   @@unique([githubId, workspaceId])
+  @@unique([githubUserId, workspaceId])
+}
+
+model Cohort {
+  id            Int            @id @default(autoincrement())
+  number        Int            @unique
+  description   String?
+  memberCohorts MemberCohort[]
+}
+
+model Role {
+  id            Int            @id @default(autoincrement())
+  name          String         @unique
+  memberCohorts MemberCohort[]
+}
+
+model MemberCohort {
+  id       Int    @id @default(autoincrement())
+  memberId Int
+  cohortId Int
+  roleId   Int
+  role     Role   @relation(fields: [roleId], references: [id])
+  cohort   Cohort @relation(fields: [cohortId], references: [id])
+  member   Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, cohortId, roleId])
 }
 
 model MissionRepo {
@@ -125,14 +154,4 @@ model ActivityLog {
   workspaceId Int
   createdAt   DateTime  @default(now())
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-}
-
-model MemberCohort {
-  id        Int      @id @default(autoincrement())
-  memberId  Int
-  cohort    Int
-  roles     String   @default("[\"crew\"]") // JSON array string
-  member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
-
-  @@unique([memberId, cohort])
 }

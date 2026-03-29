@@ -4,7 +4,7 @@ export function normalizeNickname(nickname: string): string {
   return nickname
     .replace(/\s*\([^)]*\)\s*$/, '') // 빌리(정환희) → 빌리
     .replace(/^[\[({]+|[\])}]+$/g, '') // [버건디] → 버건디
-    .replace(/[!?.,:;]+$/g, '') // 버건디! → 버건디
+    .replace(/[^가-힣]/g, '') // 한글만
     .trim();
 }
 
