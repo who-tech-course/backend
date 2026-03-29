@@ -212,16 +212,23 @@ export function createSyncService(deps: {
         }
 
         await submissionRepo.upsert({
-          where: { prNumber_missionRepoId: { prNumber: s.prNumber, missionRepoId: repo.id } },
+          where: {
+            prNumber_missionRepoId: { prNumber: s.prNumber, missionRepoId: repo.id },
+          },
           create: {
             prNumber: s.prNumber,
             prUrl: s.prUrl,
             title: s.title,
             submittedAt: s.submittedAt,
-            memberId: member.id,
+            memberId: member.id, // 새로 생성된 멤버 ID
             missionRepoId: repo.id,
           },
-          update: {},
+          update: {
+            // 이미 제출 기록이 있더라도, 현재 찾은(또는 생성한) 멤버 ID로 강제 업데이트
+            memberId: member.id,
+            title: s.title, // 제목 등이 바뀌었을 수 있으니 함께 갱신
+            prUrl: s.prUrl,
+          },
         });
 
         synced++;
