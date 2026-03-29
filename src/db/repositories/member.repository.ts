@@ -75,6 +75,41 @@ export function createMemberRepository(db: PrismaClient) {
     update: (id: number, data: Prisma.MemberUncheckedUpdateInput): Promise<MemberWithRelations> =>
       db.member.update({ where: { id }, data, include: memberWithRelationsInclude }),
 
+    // MemberRepository.ts 내부
+
+    listStaleProfiles: (
+      workspaceId: number,
+      params: { staleBefore: Date; cohort?: number; limit: number }, // 👈 객체 타입으로 변경
+    ): Promise<MemberWithRelations[]> =>
+      db.member.findMany({
+        where: {
+          workspaceId,
+          // 1. 특정 날짜(staleBefore) 이전에 업데이트된 사람만
+          profileFetchedAt: { lt: params.staleBefore },
+          // 2. 기수(cohort) 필터가 있다면 추가
+          ...(params.cohort ? { memberCohorts: { some: { cohort: { number: params.cohort } } } } : {}),
+        },
+        orderBy: { profileFetchedAt: 'asc' },
+        take: params.limit, // 👈 넘겨받은 limit 적용
+        include: memberWithRelationsInclude,
+      }),
+
+    // 2. Public Service에서 에러 났던 상세 조회 (필요하다면 별칭으로 추가)
+    findPublicDetail: (githubId: string, workspaceId: number): Promise<MemberWithRelations | null> =>
+      db.member.findUnique({
+        where: { githubId_workspaceId: { githubId, workspaceId } },
+        include: memberWithRelationsInclude,
+      }),
+
+    // 3. 닉네임으로 찾기 (보통 다른 서비스에서 많이 씁니다)
+    findByNickname: (nickname: string, workspaceId: number): Promise<MemberWithRelations | null> =>
+      db.member.findFirst({
+        where: {
+          workspaceId,
+          OR: [{ nickname }, { manualNickname: nickname }],
+        },
+        include: memberWithRelationsInclude,
+      }),
     // ★ [핵심] Race Condition 방지를 위한 upsert 메서드
     // member.repository.ts
 

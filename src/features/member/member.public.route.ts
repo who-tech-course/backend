@@ -25,20 +25,23 @@ export function createMemberPublicRouter(service: MemberPublicService) {
   );
 
   // GET /members/feed?cohort=&track=
+  // [수정된 라우터 코드]
+
   router.get(
     '/feed',
     asyncHandler(async (req, res) => {
       const cohort = typeof req.query['cohort'] === 'string' ? Number(req.query['cohort']) : undefined;
       const track = typeof req.query['track'] === 'string' ? req.query['track'] : undefined;
 
-      // range 파라미터 파싱 로직 추가
-      const rangeParam = typeof req.query['range'] === 'string' ? req.query['range'] : undefined;
+      // 🚨 수정: 'range' 대신 프론트가 보내는 'days' 파라미터를 직접 읽습니다.
+      const daysParam = typeof req.query['days'] === 'string' ? req.query['days'] : undefined;
 
+      // 기본값은 7일, 파라미터가 있으면 해당 숫자를 사용
       let days = 7;
-      if (rangeParam) {
-        const parsedDays = parseInt(rangeParam.replace('d', ''), 10);
+      if (daysParam) {
+        const parsedDays = parseInt(daysParam, 10);
         if (!isNaN(parsedDays)) {
-          days = Math.min(parsedDays, 30); // 최대 30일 제한
+          days = parsedDays; // 30일 제한을 풀고 싶으면 Math.min 제거
         }
       }
 
@@ -46,12 +49,11 @@ export function createMemberPublicRouter(service: MemberPublicService) {
         await service.getFeed({
           ...(cohort && !Number.isNaN(cohort) ? { cohort } : {}),
           ...(track ? { track } : {}),
-          days, // 서비스 호출 시 days 전달
+          days, // 이제 진짜 30이 서비스로 전달됩니다!
         }),
       );
     }),
   );
-
   // GET /members/:githubId
   router.get(
     '/:githubId',

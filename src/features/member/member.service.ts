@@ -92,7 +92,7 @@ export function createMemberService(deps: {
 
     getByGithubId: async (githubId: string) => {
       const workspace = await workspaceService.getOrThrow();
-      const member = await memberRepo.findPublicDetail(githubId, workspace.id);
+      const member = await memberRepo.findByGithubId(githubId, workspace.id);
       return member ? toResponse(member) : null;
     },
 
