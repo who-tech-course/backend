@@ -177,7 +177,7 @@ export function renderMembers() {
 }
 
 function renderMemberRoleButtons(member) {
-  const roles = member.roles?.length ? member.roles : ['crew'];
+  const roles = (member.roles ?? []).length ? member.roles : ['crew'];
   return `
     <div class="role-toggle-group">
       ${['crew', 'coach', 'reviewer']
