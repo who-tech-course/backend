@@ -18,23 +18,20 @@ export function createBlogAdminService(deps: {
     syncWorkspaceBlogs: async () => {
       const workspace = await workspaceService.getOrThrow();
       if (!workspace.blogSyncEnabled) {
-        return { synced: 0, deleted: 0, skipped: true };
+        return { synced: 0, deleted: 0, failures: [], skipped: true };
       }
       return blogService.syncBlogs(workspace.id);
     },
 
+    // 1. limit 인자 다시 추가
     backfillWorkspaceBlogLinks: async (limit = 30, cohort?: number) => {
       const workspace = await workspaceService.getOrThrow();
-      // blog 없거나, 있어도 RSS 확인 안 된 멤버(unavailable/unknown) 재처리
-      const members = await memberRepo.findMany({
-        where: {
-          workspaceId: workspace.id,
-          OR: [{ blog: null }, { rssStatus: { in: ['unavailable', 'unknown'] } }],
-          ...(cohort != null ? { cohort } : {}),
-        },
-        orderBy: [{ submissions: { _count: 'desc' } }, { id: 'asc' }],
-        take: limit,
-        select: { id: true, githubId: true, githubUserId: true, nickname: true, previousGithubIds: true },
+
+      // 2. findWithFilters에 limit(take) 전달
+      const members = await memberRepo.findWithFilters(workspace.id, {
+        hasBlog: false,
+        limit, // 👈 리포지토리에 limit 전달
+        ...(cohort !== undefined ? { cohort } : {}),
       });
 
       let updated = 0;
@@ -48,20 +45,20 @@ export function createBlogAdminService(deps: {
             username: member.githubId,
           });
 
-          // 후보 URL들을 하나씩 RSS 검사 → 성공한 첫 번째를 블로그로 저장
           let confirmedBlog: string | null = null;
-          let confirmedRssUrl: string | undefined;
+          let confirmedRssUrl: string | null = null;
 
           for (const candidate of candidates) {
+            if (!candidate) continue;
             try {
               const rssCheck = await probeRss(candidate);
               if (rssCheck.status === 'available') {
                 confirmedBlog = candidate;
-                confirmedRssUrl = rssCheck.rssUrl;
+                confirmedRssUrl = rssCheck.rssUrl ?? null;
                 break;
               }
             } catch {
-              // 이 후보는 skip
+              continue;
             }
           }
 
@@ -79,16 +76,15 @@ export function createBlogAdminService(deps: {
               ...baseFields,
               blog: confirmedBlog,
               rssStatus: 'available',
-              rssUrl: confirmedRssUrl ?? null,
+              rssUrl: confirmedRssUrl,
               rssCheckedAt: new Date(),
               rssError: null,
             });
             updated++;
           } else if (candidates.length > 0 && candidates[0]) {
-            // 링크는 있으나 RSS 없음 — 일단 첫 번째 저장 (수동 확인용), 나중에 sync 때 재시도
             await memberRepo.patch(member.id, {
               ...baseFields,
-              blog: candidates[0] as string,
+              blog: candidates[0],
               rssStatus: 'unavailable',
               rssUrl: null,
               rssCheckedAt: new Date(),
@@ -96,20 +92,27 @@ export function createBlogAdminService(deps: {
             });
             updated++;
           } else {
-            // 링크 자체가 없음
-            await memberRepo.patch(member.id, { ...baseFields, avatarUrl: profile.avatarUrl });
+            await memberRepo.patch(member.id, {
+              ...baseFields,
+            });
             missing++;
           }
         } catch (error) {
           const reason =
             typeof error === 'object' && error !== null && 'status' in error
-              ? `github_api_${String(error.status)}`
+              ? `github_api_${String((error as any).status)}`
               : 'github_api_error';
           failures.push({ githubId: member.githubId, reason });
         }
       }
 
-      return { checked: members.length, updated, missing, failed: failures.length, failures: failures.slice(0, 10) };
+      return {
+        checked: members.length,
+        updated,
+        missing,
+        failed: failures.length,
+        failures: failures.slice(0, 10),
+      };
     },
   };
 }

@@ -11,11 +11,12 @@ const parser = new Parser({
   },
 });
 
+// 1. 타입 정의 수정 ('latest_refresh' 단계 제거)
 type BlogSyncFailure = {
   githubId: string;
   blog: string;
   rssUrl?: string;
-  step: 'rss_fetch' | 'blog_post_upsert' | 'cleanup' | 'latest_refresh';
+  step: 'rss_fetch' | 'blog_post_upsert' | 'cleanup';
   error: string;
 };
 
@@ -29,7 +30,6 @@ function errorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
   }
-
   return String(error);
 }
 
@@ -43,9 +43,7 @@ function sanitizeXml(xml: string): string {
 
 async function resolveBlogUrl(blogUrl: string): Promise<string | null> {
   const normalized = normalizeBlogUrl(blogUrl);
-  if (!normalized) {
-    return null;
-  }
+  if (!normalized) return null;
 
   const url = new URL(normalized);
   if (!['bit.ly', 't.co', 'tinyurl.com'].includes(url.hostname)) {
@@ -78,20 +76,14 @@ export function resolveRSSUrlsForBlog(blogUrl: string): string[] {
   if (!normalizedBlogUrl) return [];
 
   const url = new URL(normalizedBlogUrl);
-  if (isFeedPath(url.pathname)) {
-    return [normalizedBlogUrl];
-  }
+  if (isFeedPath(url.pathname)) return [normalizedBlogUrl];
 
   if (url.hostname === 'velog.io') {
     const match = url.pathname.match(/^\/@[^/]+/);
-    if (match) {
-      return [`https://v2.velog.io/rss${match[0]}`];
-    }
+    if (match) return [`https://v2.velog.io/rss${match[0]}`];
   }
 
-  if (url.hostname.endsWith('.tistory.com')) {
-    return [`${normalizedBlogUrl}/rss`];
-  }
+  if (url.hostname.endsWith('.tistory.com')) return [`${normalizedBlogUrl}/rss`];
 
   if (url.hostname === 'medium.com' || url.hostname.endsWith('.medium.com')) {
     return [`https://medium.com/feed${url.pathname}`];
@@ -124,21 +116,13 @@ async function fetchFeedText(rssUrl: string): Promise<string> {
       },
       signal: controller.signal,
     });
-
-    if (response.status === 404) {
-      throw new Error('404');
-    }
-
-    if (!response.ok) {
-      throw new Error(`Status code ${response.status}`);
-    }
-
+    if (response.status === 404) throw new Error('404');
+    if (!response.ok) throw new Error(`Status code ${response.status}`);
     return response.text();
   } finally {
     clearTimeout(timeout);
   }
 }
-
 async function fetchRSSItems(blogUrl: string): Promise<{
   items: { title?: string; link?: string; pubDate?: string }[];
   failure?: Pick<BlogSyncFailure, 'blog' | 'rssUrl' | 'step' | 'error'>;
@@ -155,9 +139,7 @@ async function fetchRSSItems(blogUrl: string): Promise<{
       return { items: feed.items, rssCheck: { status: 'available', rssUrl } };
     } catch (error) {
       const message = errorMessage(error);
-      if (message.includes('404')) {
-        continue;
-      }
+      if (message.includes('404')) continue;
 
       if (
         message.includes('Feed not recognized') ||
@@ -168,6 +150,7 @@ async function fetchRSSItems(blogUrl: string): Promise<{
         continue;
       }
 
+      // 수정 포인트: 객체 전개 연산자(...)를 사용하여 rssUrl이 있을 때만 속성을 추가합니다.
       return {
         items: [],
         failure: {
@@ -178,8 +161,8 @@ async function fetchRSSItems(blogUrl: string): Promise<{
         },
         rssCheck: {
           status: 'error',
-          ...(rssUrl ? { rssUrl } : {}),
           error: message,
+          ...(rssUrl ? { rssUrl } : {}),
         },
       };
     }
@@ -193,6 +176,7 @@ async function fetchRSSItems(blogUrl: string): Promise<{
         ...(lastError?.rssUrl ? { rssUrl: lastError.rssUrl } : {}),
         ...(lastError?.error ? { error: lastError.error } : {}),
       },
+      // 수정 포인트: lastError가 있을 때만 failure 객체를 생성하고 내부 속성도 조건부로 넣습니다.
       ...(lastError
         ? {
             failure: {
@@ -206,13 +190,9 @@ async function fetchRSSItems(blogUrl: string): Promise<{
     };
   }
 
-  return {
-    items: [],
-    rssCheck: { status: 'error', error: 'invalid blog url' },
-  };
+  return { items: [], rssCheck: { status: 'error', error: 'invalid blog url' } };
 }
 
-// 단일 URL에 RSS가 있는지 확인 (backfill 시 후보 검사용)
 export async function probeRss(blogUrl: string): Promise<RssCheckResult> {
   const { rssCheck } = await fetchRSSItems(blogUrl);
   return rssCheck;
@@ -225,17 +205,17 @@ export function createBlogService(deps: { memberRepo: MemberRepository; blogPost
     syncBlogs: async (
       workspaceId: number,
     ): Promise<{ synced: number; deleted: number; failures: BlogSyncFailure[] }> => {
+      // 기준 날짜를 상단으로 이동 (루프 내 참조 에러 방지)
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-      const members = await memberRepo.findWithFilters(workspaceId, {
-        hasBlog: true,
-      });
+
+      const members = await memberRepo.findWithFilters(workspaceId, { hasBlog: true });
 
       let synced = 0;
       const failures: BlogSyncFailure[] = [];
 
       for (const member of members) {
         const result = await fetchRSSItems(member.blog!);
+
         const latestDate = result.items
           .map((item) => (item.pubDate ? new Date(item.pubDate) : null))
           .filter((d): d is Date => d !== null && !isNaN(d.getTime()))
@@ -248,6 +228,7 @@ export function createBlogService(deps: { memberRepo: MemberRepository; blogPost
           rssError: result.rssCheck.error ?? null,
           ...(latestDate ? { lastPostedAt: latestDate } : {}),
         });
+
         if (result.failure) {
           failures.push({ githubId: member.githubId, ...result.failure });
           continue;
@@ -256,13 +237,16 @@ export function createBlogService(deps: { memberRepo: MemberRepository; blogPost
         for (const item of result.items) {
           if (!item.link || !item.title || !item.pubDate) continue;
           const publishedAt = new Date(item.pubDate);
+
+          // 30일보다 오래된 글 스킵
           if (isNaN(publishedAt.getTime()) || publishedAt < thirtyDaysAgo) continue;
 
           try {
+            // 모든 글은 원본 BlogPost 테이블 하나에만 저장/업데이트
             await blogPostRepo.upsert({
               where: { url: item.link },
               create: { url: item.link, title: item.title, publishedAt, memberId: member.id },
-              update: {},
+              update: { title: item.title, publishedAt },
             });
             synced++;
           } catch (error) {
@@ -278,18 +262,14 @@ export function createBlogService(deps: { memberRepo: MemberRepository; blogPost
       }
 
       let deleted = 0;
-
       try {
         ({ count: deleted } = await blogPostRepo.deleteBefore(thirtyDaysAgo));
       } catch (error) {
         throw new HttpError(500, `blog sync cleanup failed: ${errorMessage(error)}`);
       }
 
-      try {
-        await blogPostRepo.refreshLatest(sevenDaysAgo);
-      } catch (error) {
-        throw new HttpError(500, `blog latest refresh failed: ${errorMessage(error)}`);
-      }
+      // [통합 완료] refreshLatest는 더 이상 필요 없으므로 삭제했습니다.
+      // 이제 데이터를 가져오는 API에서 직접 7일 필터를 걸어주면 됩니다.
 
       return { synced, deleted, failures };
     },

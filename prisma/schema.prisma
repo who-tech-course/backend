@@ -136,15 +136,8 @@ model BlogPost {
   memberId    Int
   createdAt   DateTime @default(now())
   member      Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
-}
 
-model BlogPostLatest {
-  id          Int      @id @default(autoincrement())
-  url         String   @unique
-  title       String
-  publishedAt DateTime
-  memberId    Int
-  member      Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  @@index([publishedAt])
 }
 
 model ActivityLog {
