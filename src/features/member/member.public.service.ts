@@ -150,7 +150,7 @@ export function createMemberPublicService(deps: {
       };
     },
 
-    getFeed: async (filters?: { cohort?: number; track?: string; days?: number }) => {
+    getFeed: async (filters?: { cohort?: number; track?: string; days?: number; limit?: number }) => {
       const workspace = await workspaceService.getOrThrow();
 
       // days를 repository에 전달 (기본값 7)

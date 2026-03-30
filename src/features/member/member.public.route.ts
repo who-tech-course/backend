@@ -45,11 +45,14 @@ export function createMemberPublicRouter(service: MemberPublicService) {
         }
       }
 
+      const limit = days <= 7 ? 50 : 200;
+
       res.json(
         await service.getFeed({
           ...(cohort && !Number.isNaN(cohort) ? { cohort } : {}),
           ...(track ? { track } : {}),
-          days, // 이제 진짜 30이 서비스로 전달됩니다!
+          days,
+          limit,
         }),
       );
     }),
