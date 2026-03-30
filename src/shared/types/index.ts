@@ -14,6 +14,8 @@ export interface NicknameStat {
   lastSeenAt: string;
 }
 
+export type PrStatus = 'open' | 'closed' | 'merged';
+
 export interface ParsedSubmission {
   githubUserId: number | null;
   githubId: string;
@@ -23,4 +25,5 @@ export interface ParsedSubmission {
   title: string;
   submittedAt: Date;
   cohort: number | null;
+  status: PrStatus;
 }

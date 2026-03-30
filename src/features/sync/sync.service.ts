@@ -9,16 +9,23 @@ import { HttpError } from '../../shared/http.js';
 import { mergeNicknameStat, resolveDisplayNickname } from '../../shared/nickname.js';
 import { fetchRepoPRs, fetchUserBlogCandidates, parseNickname, detectCohort } from './github.service.js';
 import { probeRss } from '../blog/blog.service.js';
-import type { CohortRegexRule, CohortRule, ParsedSubmission } from '../../shared/types/index.js';
+import type { CohortRegexRule, CohortRule, ParsedSubmission, PrStatus } from '../../shared/types/index.js';
 
 type RawPR = {
   number: number;
   html_url: string;
   title: string;
+  state: string;
+  merged_at: string | null;
   user: { login: string; id?: number } | null;
   base: { ref: string };
   created_at: string;
 };
+
+function resolvePrStatus(state: string, merged_at: string | null): PrStatus {
+  if (state === 'open') return 'open';
+  return merged_at ? 'merged' : 'closed';
+}
 
 export function parsePRsToSubmissions(
   prs: RawPR[],
@@ -48,6 +55,7 @@ export function parsePRsToSubmissions(
       title: pr.title,
       submittedAt,
       cohort,
+      status: resolvePrStatus(pr.state, pr.merged_at),
     });
   }
 
@@ -215,15 +223,16 @@ export function createSyncService(deps: {
             prNumber: s.prNumber,
             prUrl: s.prUrl,
             title: s.title,
+            status: s.status,
             submittedAt: s.submittedAt,
-            memberId: member.id, // 새로 생성된 멤버 ID
+            memberId: member.id,
             missionRepoId: repo.id,
           },
           update: {
-            // 이미 제출 기록이 있더라도, 현재 찾은(또는 생성한) 멤버 ID로 강제 업데이트
             memberId: member.id,
-            title: s.title, // 제목 등이 바뀌었을 수 있으니 함께 갱신
+            title: s.title,
             prUrl: s.prUrl,
+            status: s.status,
           },
         });
 
