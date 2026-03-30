@@ -24,6 +24,7 @@ import {
   refreshMemberProfile,
   refreshMemberProfiles,
   toggleMemberRole,
+  togglePairFilter,
 } from './members.js';
 import {
   addRepo,
@@ -123,6 +124,7 @@ Object.assign(window, {
   setRepoOncePage,
   debouncedLoadMembers,
   toggleMemberRole,
+  togglePairFilter,
   openBlogModal,
   openSubmissionModal,
   refreshMemberProfile,

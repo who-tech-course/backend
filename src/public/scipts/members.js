@@ -51,17 +51,33 @@ export function debouncedLoadMembers() {
   adminState.memberSearchTimer = setTimeout(loadMembers, 180);
 }
 
+let pairFilterOn = false;
+
+export function togglePairFilter() {
+  pairFilterOn = !pairFilterOn;
+  const btn = document.getElementById('pair-filter-btn');
+  if (btn) btn.classList.toggle('active', pairFilterOn);
+  renderMembers();
+}
+
+function isPairSuspect(member) {
+  const name = member.nickname ?? '';
+  return name.includes('-') && !member.manualNickname;
+}
+
 export function renderMembers() {
   const tbody = document.getElementById('member-table-body');
   const summary = document.getElementById('member-summary');
 
-  if (adminState.memberList.length === 0) {
+  const list = pairFilterOn ? adminState.memberList.filter(isPairSuspect) : adminState.memberList;
+
+  if (list.length === 0) {
     tbody.innerHTML = `<tr><td colspan="10" class="muted">조건에 맞는 멤버가 없습니다.</td></tr>`;
     summary.textContent = '총 0명';
     return;
   }
 
-  tbody.innerHTML = adminState.memberList
+  tbody.innerHTML = list
     .map(
       (member) => `
     <tr>
@@ -82,7 +98,10 @@ export function renderMembers() {
       </td>
       <td>
         <div class="stack">
-          <strong>${escapeHtml(member.nickname ?? '-')}</strong>
+          <div style="display:flex;align-items:center;gap:6px">
+            <strong>${escapeHtml(member.nickname ?? '-')}</strong>
+            ${isPairSuspect(member) ? `<span title="페어 닉네임 의심 — manualNickname으로 개별 이름을 지정하세요" style="font-size:12px;cursor:help">⚠️</span>` : ''}
+          </div>
           <span class="muted">manual: ${escapeHtml(member.manualNickname ?? '-')}</span>
         </div>
       </td>
