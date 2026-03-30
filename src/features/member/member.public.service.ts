@@ -16,7 +16,7 @@ export function createMemberPublicService(deps: {
     name: string;
     track: string | null;
     tabCategory: string;
-    submissions: Array<{ prUrl: string; prNumber: number; title: string; submittedAt: Date }> | null;
+    submissions: Array<{ prUrl: string; prNumber: number; title: string; status: string; submittedAt: Date }> | null;
   }
 
   return {
@@ -67,7 +67,7 @@ export function createMemberPublicService(deps: {
 
       const submissionsByRepo = new Map<
         number,
-        Array<{ prUrl: string; prNumber: number; title: string; submittedAt: Date }>
+        Array<{ prUrl: string; prNumber: number; title: string; status: string; submittedAt: Date }>
       >();
       for (const s of [...member.submissions].reverse()) {
         if (!submissionsByRepo.has(s.missionRepoId)) submissionsByRepo.set(s.missionRepoId, []);
@@ -75,6 +75,7 @@ export function createMemberPublicService(deps: {
           prUrl: s.prUrl,
           prNumber: s.prNumber,
           title: s.title,
+          status: s.status,
           submittedAt: s.submittedAt,
         });
       }
@@ -138,7 +139,14 @@ export function createMemberPublicService(deps: {
         blog: member.blog,
         lastPostedAt: member.lastPostedAt,
         archive,
-        blogPosts: member.blogPostsLatest,
+        blogPosts: member.blogPosts,
+        person: member.person
+          ? {
+              id: member.person.id,
+              displayName: member.person.displayName,
+              members: member.person.members.filter((m) => m.githubId !== member.githubId),
+            }
+          : null,
       };
     },
 

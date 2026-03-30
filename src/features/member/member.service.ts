@@ -47,7 +47,7 @@ export function createMemberService(deps: {
       cohort: primaryCohort?.cohort ?? null,
       roles: primaryCohort?.roles ?? ['crew'],
       tracks: [...new Set(member.submissions.map((s) => s.missionRepo.track).filter((t) => t !== null))],
-      blogPostsLatest: member.blogPostsLatest,
+      blogPosts: member.blogPosts,
       submissions: member.submissions,
       _count: member._count,
     };

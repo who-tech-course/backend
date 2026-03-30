@@ -4,7 +4,14 @@ import type { PrismaClient } from '@prisma/client';
 // 1. 포함할 관계 정의 (타입 추론의 핵심)
 const memberWithRelationsInclude = Prisma.validator<Prisma.MemberInclude>()({
   _count: { select: { submissions: true } },
-  blogPostsLatest: { orderBy: { publishedAt: 'desc' as const } },
+  blogPosts: { orderBy: { publishedAt: 'desc' as const }, take: 10 },
+  person: {
+    include: {
+      members: {
+        select: { id: true, githubId: true, nickname: true, manualNickname: true, avatarUrl: true },
+      },
+    },
+  },
   memberCohorts: {
     include: {
       cohort: true,
@@ -13,7 +20,17 @@ const memberWithRelationsInclude = Prisma.validator<Prisma.MemberInclude>()({
   },
   submissions: {
     orderBy: { submittedAt: 'desc' as const },
-    include: { missionRepo: { select: { id: true, name: true, track: true, level: true, tabCategory: true } } },
+    select: {
+      id: true,
+      prNumber: true,
+      prUrl: true,
+      title: true,
+      status: true,
+      submittedAt: true,
+      memberId: true,
+      missionRepoId: true,
+      missionRepo: { select: { id: true, name: true, track: true, level: true, tabCategory: true } },
+    },
   },
 });
 
@@ -170,7 +187,6 @@ export function createMemberRepository(db: PrismaClient) {
     deleteWithRelations: (id: number) =>
       db.$transaction([
         db.blogPost.deleteMany({ where: { memberId: id } }),
-        db.blogPostLatest.deleteMany({ where: { memberId: id } }),
         db.submission.deleteMany({ where: { memberId: id } }),
         db.member.delete({ where: { id } }),
       ]),
@@ -178,7 +194,6 @@ export function createMemberRepository(db: PrismaClient) {
     deleteAllWithRelations: (workspaceId: number) =>
       db.$transaction([
         db.blogPost.deleteMany({ where: { member: { workspaceId } } }),
-        db.blogPostLatest.deleteMany({ where: { member: { workspaceId } } }),
         db.submission.deleteMany({ where: { member: { workspaceId } } }),
         db.member.deleteMany({ where: { workspaceId } }),
       ]),
